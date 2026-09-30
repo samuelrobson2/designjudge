@@ -1,0 +1,18 @@
+{
+  "id": "harmless-accent-teal",
+  "case": "dashboard-baseline",
+  "kind": "harmless",
+  "title": "Accent colour changed to teal",
+  "symptom": "The accent (active nav item, chart line, bars, links) changes from rust to teal. Only colours change.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ":root { --accent: #0f766e; --accent-soft: #e6f4f1; }\n.area { fill: rgba(15, 118, 110, 0.08); }",
+  "js": null
+}

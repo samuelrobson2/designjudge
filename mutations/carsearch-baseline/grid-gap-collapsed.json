@@ -1,0 +1,21 @@
+{
+  "id": "grid-gap-collapsed",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Result cards almost touch side by side",
+  "symptom": "The horizontal gap between result cards shrank to 3 px while the vertical gap stays 20 px. Side-by-side cards nearly merge, making the grid look like wide double cards and making it harder to tell which details belong to which car.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet"
+    ],
+    "widths": [
+      768,
+      1920
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": ".grid { column-gap: 3px !important; }",
+  "js": null
+}

@@ -1,0 +1,20 @@
+{
+  "id": "layout-min-width-overflow",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Two-column layout forces horizontal scrolling on tablets",
+  "symptom": "The form column was given a 480 px minimum next to a 340 px summary. Between 768 px and about 868 px the two columns no longer fit, so the whole page scrolls sideways and the summary card (with the Confirm button) is cut off at the right edge of the screen.",
+  "where": {
+    "viewports": [
+      "tablet"
+    ],
+    "widths": [
+      768,
+      867
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": "@media (min-width: 768px) {\n  .booking-layout { grid-template-columns: minmax(480px, 1fr) 340px !important; }\n}",
+  "js": null
+}

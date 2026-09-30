@@ -1,0 +1,20 @@
+{
+  "id": "action-bar-covers-notes",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Fixed action bar covers the end of the form",
+  "symptom": "On phones the page no longer reserves space for the fixed \"Confirm booking\" bar. When the user scrolls to the bottom, the bar sits on top of the \"Anything we should know?\" textarea, and the end of the form cannot be scrolled out from under it.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": "Scroll to the bottom of the page"
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .page { padding-bottom: 16px !important; }\n}",
+  "js": null
+}

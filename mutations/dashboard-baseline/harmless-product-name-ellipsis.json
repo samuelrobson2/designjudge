@@ -1,0 +1,22 @@
+{
+  "id": "harmless-product-name-ellipsis",
+  "case": "dashboard-baseline",
+  "kind": "harmless",
+  "title": "Long product names truncated with an ellipsis",
+  "symptom": "Product names that do not fit on one line end with an ellipsis, while the revenue figure stays fully visible on the right. Intentional, tidy truncation.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "content": [
+      "dense",
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ".product__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }",
+  "js": null
+}

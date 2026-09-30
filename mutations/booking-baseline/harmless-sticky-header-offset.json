@@ -1,0 +1,18 @@
+{
+  "id": "harmless-sticky-header-offset",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Sticky header with the summary offset below it",
+  "symptom": "The site header stays at the top while scrolling, and the sticky summary is offset to stick just below the header, so nothing is hidden underneath it. Anchor jumps also leave room for the header.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Scroll down the page"
+  },
+  "severity": "none",
+  "css": ".site-header { position: sticky; top: 0; z-index: 10; }\n.summary { top: 85px !important; }\nhtml { scroll-padding-top: 80px; }",
+  "js": null
+}

@@ -1,0 +1,19 @@
+{
+  "id": "dashboard-mobile-overflow",
+  "title": "Store sales dashboard — variant (hidden change)",
+  "request": "Create a dashboard for an online store owner to track this month's revenue and key metrics (orders, average order value, conversion rate), see the revenue trend over time, see top-selling products, and review recent orders.",
+  "source": {
+    "type": "static",
+    "dir": "site"
+  },
+  "entry": "/index.html",
+  "fixtures": {
+    "supported": [
+      "empty",
+      "typical",
+      "dense",
+      "expanded",
+      "stress"
+    ]
+  }
+}

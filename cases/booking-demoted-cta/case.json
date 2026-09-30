@@ -1,0 +1,19 @@
+{
+  "id": "booking-demoted-cta",
+  "title": "Physio booking — variant (hidden change)",
+  "request": "Build a web page where patients of a physiotherapy clinic can book an appointment: choose a treatment, pick a practitioner, choose an available date and time, enter their details, and confirm the booking.",
+  "source": {
+    "type": "static",
+    "dir": "site"
+  },
+  "entry": "/index.html",
+  "fixtures": {
+    "supported": [
+      "empty",
+      "typical",
+      "dense",
+      "expanded",
+      "stress"
+    ]
+  }
+}

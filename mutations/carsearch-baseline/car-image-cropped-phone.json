@@ -1,0 +1,20 @@
+{
+  "id": "car-image-cropped-phone",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Car photos cropped to a thin strip on phones",
+  "symptom": "To make the list denser on phones, the image box was fixed at 88 px tall. The picture is cropped to a thin letterbox, cutting off the roof and wheels, so the photo no longer shows the car properly.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .car-img { aspect-ratio: auto !important; height: 88px; }\n}",
+  "js": null
+}

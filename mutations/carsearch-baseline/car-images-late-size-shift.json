@@ -1,0 +1,18 @@
+{
+  "id": "car-images-late-size-shift",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Car images appear late and push the listings down",
+  "symptom": "Car image boxes have no reserved size until the images \"load\". For the first ~1.5 s the cards show text only, then every image pops in at full height and all card content, the rest of the grid and \"Show more\" jump down.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Watch the first 1-2 seconds after load"
+  },
+  "severity": "moderate",
+  "css": ".dj-img-pending .car-img { aspect-ratio: auto !important; height: 0; overflow: hidden; }",
+  "js": "document.documentElement.classList.add('dj-img-pending');\nsetTimeout(function () { document.documentElement.classList.remove('dj-img-pending'); }, 1500);"
+}

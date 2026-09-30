@@ -1,0 +1,20 @@
+{
+  "id": "filters-drawer-footer-unreachable",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Filter drawer footer pushed off the bottom of the screen",
+  "symptom": "In the phone filter drawer the filter list no longer scrolls on its own. The list is taller than the screen, so the lower filters and the \"Show N cars\" button are pushed below the bottom edge of the fixed drawer and cannot be reached.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": "Tap \"Filters\" to open the filter drawer"
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 767px) {\n  .filters__body { flex: none !important; overflow: visible !important; }\n}",
+  "js": null
+}

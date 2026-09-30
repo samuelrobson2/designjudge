@@ -1,0 +1,18 @@
+{
+  "id": "save-buttons-escape-image",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Save (heart) buttons pile up in the page corner",
+  "symptom": "The image box lost position: relative, so every heart \"Save\" button is positioned against the page instead of its photo. All of them stack in the top-right corner of the page on top of the header links, and none appear on the car photos.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": ".car-img { position: static !important; }",
+  "js": null
+}

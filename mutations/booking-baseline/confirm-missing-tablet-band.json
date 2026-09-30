@@ -1,0 +1,20 @@
+{
+  "id": "confirm-missing-tablet-band",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "No Confirm button at tablet widths",
+  "symptom": "The summary sidebar is hidden below 1024 px, but the mobile action bar only appears below 768 px. Between 768 and 1023 px there is no \"Confirm booking\" button anywhere on the page, so the booking cannot be completed.",
+  "where": {
+    "viewports": [
+      "tablet"
+    ],
+    "widths": [
+      768,
+      1023
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 1023px) {\n  .summary { display: none !important; }\n  .booking-layout { grid-template-columns: minmax(0, 1fr) !important; }\n}",
+  "js": null
+}

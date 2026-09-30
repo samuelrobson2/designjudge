@@ -1,0 +1,19 @@
+{
+  "id": "carsearch-baseline",
+  "title": "Used car search — baseline (no component annotations)",
+  "request": "Build a page to browse used cars for sale near the user, filter them by price, make, mileage and fuel type, sort the results, and compare listings to find a good deal.",
+  "source": {
+    "type": "static",
+    "dir": "site"
+  },
+  "entry": "/index.html",
+  "fixtures": {
+    "supported": [
+      "empty",
+      "typical",
+      "dense",
+      "expanded",
+      "stress"
+    ]
+  }
+}

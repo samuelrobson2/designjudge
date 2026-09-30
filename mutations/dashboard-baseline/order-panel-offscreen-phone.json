@@ -1,0 +1,20 @@
+{
+  "id": "order-panel-offscreen-phone",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Order panel wider than the phone screen",
+  "symptom": "The desktop 440 px side panel is used unchanged on phones. When an order is opened, the panel extends ~80 px past the left edge of the 360 px screen: the order number, date, item names and customer details are cut off on the left, and the panel cannot be scrolled sideways.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": "Tap an order in \"Recent orders\""
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 767px) {\n  .panel { width: 440px !important; }\n}",
+  "js": null
+}

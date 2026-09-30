@@ -1,0 +1,20 @@
+{
+  "id": "action-bar-ignores-safe-area",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Bottom action bar ignores the safe-area inset",
+  "symptom": "The fixed bottom bar drops its env(safe-area-inset-bottom) padding, so on a phone with a home indicator the \"Confirm booking\" button sits partly inside the bottom 24 px unsafe area, where it collides with the system gesture bar.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .action-bar { padding-bottom: 12px !important; }\n}",
+  "js": null
+}

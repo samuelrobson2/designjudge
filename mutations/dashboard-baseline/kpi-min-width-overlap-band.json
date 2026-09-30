@@ -1,0 +1,18 @@
+{
+  "id": "kpi-min-width-overlap-band",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "KPI cards overlap each other in a narrow desktop band",
+  "symptom": "KPI cards were given a 300 px minimum width. In the four-column layout between 1440 px and ~1560 px wide the grid columns are narrower than that, so each card overlaps the one to its right by up to ~30 px, hiding the left edge of the next card. It does not appear at 1920 px or below 1440 px (two columns).",
+  "where": {
+    "viewports": [],
+    "widths": [
+      1440,
+      1559
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (min-width: 1440px) {\n  .kpi { min-width: 300px; }\n}",
+  "js": null
+}

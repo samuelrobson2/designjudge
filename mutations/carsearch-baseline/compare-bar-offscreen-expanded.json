@@ -1,0 +1,24 @@
+{
+  "id": "compare-bar-offscreen-expanded",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Compare bar runs off the phone screen with long text",
+  "symptom": "On phones the fixed compare bar is sized to its content and never wraps. With longer (localised) labels it becomes wider than the screen, so the \"Compare now\" button is cut off past the right edge; because the bar is fixed it cannot be scrolled into view.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "content": [
+      "expanded",
+      "stress"
+    ],
+    "interaction": "Tick \"Compare\" on two cars"
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 767px) {\n  .compare-bar { right: auto !important; white-space: nowrap; }\n}",
+  "js": null
+}

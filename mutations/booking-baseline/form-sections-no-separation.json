@@ -1,0 +1,18 @@
+{
+  "id": "form-sections-no-separation",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Form steps run together with no separation",
+  "symptom": "The spacing and dividers between the numbered steps were removed. The heading of each step sits almost directly under the controls of the previous one, so it is hard to see where \"Treatment\" ends and \"Practitioner\" or \"Date and time\" begins.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": ".form-section { padding: 4px 0 !important; }\n.form-section + .form-section { border-top: 0 !important; }\n.form-section__head { margin-bottom: 6px !important; }",
+  "js": null
+}

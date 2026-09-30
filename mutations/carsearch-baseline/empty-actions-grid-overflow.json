@@ -1,0 +1,24 @@
+{
+  "id": "empty-actions-grid-overflow",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Empty-state buttons overflow on small screens",
+  "symptom": "The \"no results\" recovery buttons were laid out as a fixed three-column row. On phones and small tablets the centred row of three buttons is wider than the empty-state box, so it spills out on both sides: the first button is cut off past the left edge of the screen (where it cannot be scrolled to) and the last one past the right edge.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      840
+    ],
+    "content": [
+      "empty"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".empty__actions { display: grid !important; grid-template-columns: repeat(3, max-content); justify-content: center; }",
+  "js": null
+}

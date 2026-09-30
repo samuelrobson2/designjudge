@@ -1,0 +1,22 @@
+{
+  "id": "car-location-nowrap-hides-compare",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Long location text hides the Compare checkbox",
+  "symptom": "The location line in each card footer is forced onto one line. For long town names (especially localised), it pushes the \"Compare\" checkbox past the right edge of the card, where it is clipped and cannot be used.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "content": [
+      "expanded",
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".car__loc { white-space: nowrap; }",
+  "js": null
+}

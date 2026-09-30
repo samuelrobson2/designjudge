@@ -1,0 +1,21 @@
+{
+  "id": "slot-touch-targets-tiny",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Time-slot buttons shrink to tiny tap targets",
+  "symptom": "A \"compact\" rule for smaller screens shrinks the time-slot buttons to 24 px tall with small text. On touch screens they are well below a comfortable tap size and packed together, so users easily hit the wrong time.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": "@media (max-width: 1023px) {\n  .slot { min-height: 0 !important; height: 24px; font-size: 12px; padding: 0; }\n  .slot-grid { gap: 4px !important; }\n}",
+  "js": null
+}

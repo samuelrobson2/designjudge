@@ -1,0 +1,21 @@
+{
+  "id": "topbar-covers-drawer",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Top bar is stacked above the navigation drawer",
+  "symptom": "On tablet and phone the sticky top bar has a higher z-index than the slide-out navigation drawer. When the menu is opened, the top bar covers the drawer header, so the drawer's store name and close (X) button are hidden and the menu cannot be closed.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ],
+    "interaction": "Tap the menu (hamburger) button"
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 1023px) {\n  .topbar { z-index: 30 !important; }\n}",
+  "js": null
+}

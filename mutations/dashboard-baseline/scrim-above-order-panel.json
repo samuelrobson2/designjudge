@@ -1,0 +1,18 @@
+{
+  "id": "scrim-above-order-panel",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Dimmed backdrop covers the order panel",
+  "symptom": "The backdrop behind the order panel was given a z-index, so it is painted on top of the panel. After opening an order the panel appears greyed out, and any tap on its buttons hits the backdrop and closes the panel instead.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Click an order in \"Recent orders\""
+  },
+  "severity": "severe",
+  "css": ".scrim { z-index: 1; }",
+  "js": null
+}

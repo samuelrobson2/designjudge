@@ -1,0 +1,6 @@
+{
+  "description": "Written for the model: fixed briefing and rubric rules in the system prompt; user message reads task, states, the essential screenshots, then each criterion with focused evidence beneath it (only the checks and observations it bears on most; failing checks in full, all-pass checks in one line, observations with every item; missing evidence left out).",
+  "rubric": "llm",
+  "render": "text",
+  "packet": { "grouping": "by-criterion", "screenshots": "essential", "evidence": "focused" }
+}

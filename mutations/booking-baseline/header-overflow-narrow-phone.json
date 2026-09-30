@@ -1,0 +1,20 @@
+{
+  "id": "header-overflow-narrow-phone",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Header overflows on narrow phones",
+  "symptom": "The clinic location (\"Clapham\") is shown in the header on phones and the brand cannot shrink. On screens narrower than ~385 px the header content is wider than the screen, so the phone number is pushed past the right edge and the page scrolls horizontally.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      384
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .brand__location { display: inline !important; }\n  .brand { flex: none; white-space: nowrap; }\n}",
+  "js": null
+}

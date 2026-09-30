@@ -1,0 +1,20 @@
+{
+  "id": "orders-list-cramped-phone",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Mobile order list loses its row separation",
+  "symptom": "On phones the dividers and vertical padding between orders were removed. The lines of consecutive orders run into each other, so it is hard to tell which customer, date and total belong to which order.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": "@media (max-width: 767px) {\n  .order-card { padding: 1px 0 !important; gap: 0 !important; }\n  .orders-list li + li { border-top: 0 !important; }\n}",
+  "js": null
+}

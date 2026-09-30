@@ -1,0 +1,18 @@
+{
+  "id": "field-errors-overlap-labels",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Validation messages overlap the next field",
+  "symptom": "Field error messages were absolutely positioned under their inputs \"to avoid layout shift\". After pressing Confirm with an empty form, no space is made for them: \"Enter your full name\" is jammed against the Email label, and the two-line email error is drawn on top of the next label (\"Anything we should know?\" on desktop, \"Phone (optional)\" on phones), making both unreadable.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Press \"Confirm booking\" with the form empty, then look at the \"Your details\" section"
+  },
+  "severity": "moderate",
+  "css": ".field { position: relative; }\n.field .field-error { position: absolute; top: 100%; left: 0; right: 0; margin-top: 2px; }",
+  "js": null
+}

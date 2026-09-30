@@ -1,0 +1,18 @@
+{
+  "id": "harmless-kpi-accent-rule",
+  "case": "dashboard-baseline",
+  "kind": "harmless",
+  "title": "KPI cards get a coloured top rule",
+  "symptom": "Each KPI card gets a 3 px accent-coloured top border and a slightly heavier value weight. Decorative only.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ".kpi { border-top: 3px solid var(--accent); }\n.kpi__value { font-weight: 720; }",
+  "js": null
+}

@@ -1,0 +1,20 @@
+{
+  "id": "harmless-chips-scroller-phone",
+  "case": "carsearch-baseline",
+  "kind": "harmless",
+  "title": "Active filter chips scroll sideways on phones",
+  "symptom": "On phones the active-filter chips sit in a single row that scrolls horizontally inside the results column, with the next chip visibly cut at the edge. The page itself does not scroll sideways.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": "Apply several filters"
+  },
+  "severity": "none",
+  "css": "@media (max-width: 767px) {\n  .chips { position: relative; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; }\n  .chip, .chips .link-btn { flex: none; white-space: nowrap; }\n  .chips::-webkit-scrollbar { height: 6px; }\n  .chips::-webkit-scrollbar-track { background: #eef0f3; border-radius: 3px; }\n  .chips::-webkit-scrollbar-thumb { background: #b7bec8; border-radius: 3px; }\n}",
+  "js": null
+}

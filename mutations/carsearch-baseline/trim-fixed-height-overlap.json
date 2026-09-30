@@ -1,0 +1,24 @@
+{
+  "id": "trim-fixed-height-overlap",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Wrapped trim text overlaps the price",
+  "symptom": "The grey trim line under each car title has a fixed one-line height. When the trim wraps (longer localised trims in the narrow two-column cards just above the 768 px breakpoint), the second line spills down and is drawn on top of the large price, making both hard to read. From ~850 px the trims fit on one line and the problem disappears.",
+  "where": {
+    "viewports": [
+      "tablet"
+    ],
+    "widths": [
+      768,
+      820
+    ],
+    "content": [
+      "expanded",
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".car__trim { height: 20px; }",
+  "js": null
+}

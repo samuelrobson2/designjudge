@@ -1,0 +1,18 @@
+{
+  "id": "harmless-deal-badge-on-image",
+  "case": "carsearch-baseline",
+  "kind": "harmless",
+  "title": "Deal badge overlaid on the car photo",
+  "symptom": "The \"Great price\" / \"Good price\" badge is moved onto the top-left corner of the photo as a sticker. It intentionally overlaps the image, away from the save button, and hides nothing important.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ".car { position: relative; }\n.deal { position: absolute; top: 10px; left: 10px; margin: 0; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.15); }",
+  "js": null
+}

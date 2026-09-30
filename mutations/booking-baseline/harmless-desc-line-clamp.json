@@ -1,0 +1,18 @@
+{
+  "id": "harmless-desc-line-clamp",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Treatment descriptions clamped to two lines",
+  "symptom": "Long treatment descriptions are deliberately limited to two lines with an ellipsis. Names, prices and durations stay fully visible and the cards line up more evenly.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ".option-card__desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }",
+  "js": null
+}

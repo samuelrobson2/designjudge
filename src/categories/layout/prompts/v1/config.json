@@ -1,0 +1,5 @@
+{
+  "description": "Full layout_rubric.md verbatim (including diagnostic implementation specs); evidence grouped by type.",
+  "rubric": "full",
+  "packet": { "grouping": "by-type" }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "chart-late-render-shift",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Chart appears late and shoves the page down",
+  "symptom": "The revenue chart has no reserved height while it \"loads\". For the first ~1.5 s the chart card is just a header, then the 280 px chart pops in and everything below it (top products on narrow screens, recent orders) jumps down.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Watch the first 1-2 seconds after load"
+  },
+  "severity": "moderate",
+  "css": ".dj-chart-pending .chart, .dj-chart-pending .chart-card .empty { display: none !important; }",
+  "js": "document.documentElement.classList.add('dj-chart-pending');\nsetTimeout(function () { document.documentElement.classList.remove('dj-chart-pending'); }, 1500);"
+}

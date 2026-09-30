@@ -1,0 +1,18 @@
+{
+  "id": "harmless-green-theme",
+  "case": "carsearch-baseline",
+  "kind": "harmless",
+  "title": "Primary colour changed to green",
+  "symptom": "Buttons, links, chips and toggles change from blue to green. Only colours change.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ":root { --primary: #0e7c66; --primary-hover: #0a5f4e; --primary-soft: #e6f4f0; --good: #0e7c66; }",
+  "js": null
+}

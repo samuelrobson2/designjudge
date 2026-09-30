@@ -1,0 +1,25 @@
+{
+  "id": "summary-row-nowrap-expanded",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Summary values overflow the summary card with long text",
+  "symptom": "Summary values are set to never wrap. With longer (localised) treatment names, once a treatment is chosen its name runs straight out of the right side of the \"Your appointment\" card, beyond the card border.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet"
+    ],
+    "widths": [
+      768,
+      1920
+    ],
+    "content": [
+      "expanded",
+      "stress"
+    ],
+    "interaction": "Select a treatment (and a time)"
+  },
+  "severity": "moderate",
+  "css": ".summary__row dd { white-space: nowrap; }",
+  "js": null
+}

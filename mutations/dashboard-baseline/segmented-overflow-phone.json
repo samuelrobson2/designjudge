@@ -1,0 +1,24 @@
+{
+  "id": "segmented-overflow-phone",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Date-range control overflows the phone screen with long labels",
+  "symptom": "On phones the date-range buttons no longer scroll inside their own track. With longer (localised) labels the control is wider than the screen, so it sticks out past the right edge and the whole page scrolls sideways; the last range is cut off.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "content": [
+      "expanded",
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .segmented { overflow-x: visible !important; display: inline-flex !important; }\n}",
+  "js": null
+}

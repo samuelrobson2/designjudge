@@ -1,0 +1,18 @@
+{
+  "id": "active-chips-nowrap",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Active filter chips squashed onto one line",
+  "symptom": "The row of active-filter chips can no longer wrap. With several filters applied, the chips are squeezed into one line: their text breaks into two-line pills and on narrow screens the row runs past the edge of the results column.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Apply several filters (all makes, max price, mileage, fuel, gearbox)"
+  },
+  "severity": "moderate",
+  "css": ".chips { flex-wrap: nowrap !important; }",
+  "js": null
+}

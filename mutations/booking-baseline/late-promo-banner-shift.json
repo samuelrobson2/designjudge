@@ -1,0 +1,18 @@
+{
+  "id": "late-promo-banner-shift",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Late banner pushes the page down after load",
+  "symptom": "About 1.2 s after the page appears, a promotional banner is inserted between the header and the form. Everything below it jumps down (by ~60 px on desktop, ~110 px on phones where the text wraps), so a user who had started reading or tapping a treatment card ends up hitting something else.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": "Watch the first 1-2 seconds after load"
+  },
+  "severity": "moderate",
+  "css": ".dj-promo { background: #fff4dc; color: #5c3d00; padding: 18px 24px; text-align: center; font-weight: 600; border-bottom: 1px solid #f0d9a8; }",
+  "js": "setTimeout(function () {\n  if (document.querySelector('.dj-promo')) return;\n  var b = document.createElement('div');\n  b.className = 'dj-promo';\n  b.textContent = 'New: evening appointments on Thursdays until 9pm.';\n  var h = document.querySelector('.site-header');\n  if (h) h.after(b);\n}, 1200);"
+}

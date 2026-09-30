@@ -1,0 +1,21 @@
+{
+  "id": "grid-min-card-width-overflow",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Results grid keeps three 300 px columns",
+  "symptom": "The results grid always uses three columns with a 300 px minimum. Below ~1270 px the columns no longer fit, so car cards run off the right edge of the page and the page scrolls sideways; on phones two of the three columns are off-screen.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1269
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": ".grid { grid-template-columns: repeat(3, minmax(300px, 1fr)) !important; }",
+  "js": null
+}

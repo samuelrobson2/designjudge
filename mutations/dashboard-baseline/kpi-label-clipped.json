@@ -1,0 +1,24 @@
+{
+  "id": "kpi-label-clipped",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "KPI labels cut off without an ellipsis",
+  "symptom": "KPI labels are forced onto one line with overflow hidden but no ellipsis. On phones, longer (localised) labels such as \"Average order value\" or \"Conversion rate\" are chopped off mid-word at the card edge with no hint that text is missing.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "content": [
+      "expanded",
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": ".kpi__label { white-space: nowrap; overflow: hidden; }",
+  "js": null
+}

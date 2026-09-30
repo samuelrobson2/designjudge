@@ -1,0 +1,21 @@
+{
+  "id": "product-name-nowrap",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Long product names push revenue out of the card",
+  "symptom": "Product names in \"Top products\" are forced onto one line. A long name such as \"Hand-thrown ceramic fruit bowl (large, speckled glaze)\" is wider than the card, pushing its revenue figure past the card edge. On phones this happens with dense content and the page scrolls sideways; on desktop it takes the longer localised names (stress), where the revenue figure sits outside the card.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "phone"
+    ],
+    "content": [
+      "dense",
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".product__name { white-space: nowrap; }",
+  "js": null
+}

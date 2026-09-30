@@ -1,0 +1,20 @@
+{
+  "id": "header-search-fixed-basis",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Header search box too wide at small tablet widths",
+  "symptom": "The header search box has a fixed 560 px width from 768 px up. Between 768 px and ~850 px the header content is wider than the screen, so the \"Saved\" link is pushed off the right edge and the page scrolls sideways.",
+  "where": {
+    "viewports": [
+      "tablet"
+    ],
+    "widths": [
+      768,
+      849
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (min-width: 768px) {\n  .search { flex: 0 0 560px !important; }\n}",
+  "js": null
+}

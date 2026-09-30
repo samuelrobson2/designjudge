@@ -1,0 +1,20 @@
+{
+  "id": "sidebar-fixed-overlaps-main",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Fixed sidebar covers the left edge of the content",
+  "symptom": "The sidebar was changed to position: fixed with a hard-coded 180 px content offset, but the sidebar is 240 px wide. On wide screens it covers the first ~24 px of the page: the start of the \"Overview\" heading and the left edges of the KPI cards and chart are hidden beneath it.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ],
+    "widths": [
+      1024,
+      1920
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (min-width: 1024px) {\n  .shell { display: block !important; }\n  .sidebar { position: fixed !important; left: 0; top: 0; width: 240px; z-index: 3; }\n  .main { margin-left: 180px; width: auto !important; }\n}",
+  "js": null
+}

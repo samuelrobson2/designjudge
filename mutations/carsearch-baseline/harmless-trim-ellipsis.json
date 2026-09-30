@@ -1,0 +1,21 @@
+{
+  "id": "harmless-trim-ellipsis",
+  "case": "carsearch-baseline",
+  "kind": "harmless",
+  "title": "Trim line truncated with an ellipsis",
+  "symptom": "Each car's trim description is kept to one line and ends with an ellipsis if it is too long. Deliberate truncation of secondary text; title and price stay intact.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "content": [
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ".car__trim { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }",
+  "js": null
+}

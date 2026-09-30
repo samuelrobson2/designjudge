@@ -1,0 +1,20 @@
+{
+  "id": "harmless-orders-table-scroller",
+  "case": "dashboard-baseline",
+  "kind": "harmless",
+  "title": "Orders table scrolls sideways inside its card",
+  "symptom": "On tablet and desktop the orders table keeps a 760 px minimum width and scrolls horizontally inside the card when there is less room, with a visible scrollbar. The page itself does not scroll sideways.",
+  "where": {
+    "viewports": [
+      "tablet"
+    ],
+    "widths": [
+      768,
+      1100
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": "@media (min-width: 768px) {\n  .orders-card { overflow-x: auto; }\n  .orders-table { min-width: 760px; }\n  .orders-card::-webkit-scrollbar { height: 8px; }\n  .orders-card::-webkit-scrollbar-track { background: #eef0f3; border-radius: 4px; }\n  .orders-card::-webkit-scrollbar-thumb { background: #b7bec8; border-radius: 4px; }\n}",
+  "js": null
+}

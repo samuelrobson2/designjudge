@@ -1,0 +1,18 @@
+{
+  "id": "inputs-content-box-overflow",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Text inputs are wider than their fields",
+  "symptom": "The inputs use content-box sizing with width: 100%, so padding and border are added on top. Every input and the textarea stick out ~26 px past the right side of its field: in two-column rows the Email box runs into the Phone box, and on phones the inputs poke out of the form card.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": ".field input, .field textarea { box-sizing: content-box !important; }",
+  "js": null
+}

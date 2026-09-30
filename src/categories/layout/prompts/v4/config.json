@@ -1,0 +1,11 @@
+{
+  "description": "Findings only: the same system prompt structure and essential screenshots as v3, but each criterion's evidence is only what failing checks found (one plain-words line per issue, merged across states, content variants and widths) and observation measurements outside or close to their reference. Passing checks, in-range measurements, selectors, boxes and collection details are left out; states are described by what they are. Failing-check issues are numbered and outlined in red on the screenshots.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "screenshots": "essential",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true
+}

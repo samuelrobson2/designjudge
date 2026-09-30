@@ -1,0 +1,18 @@
+{
+  "id": "chart-x-labels-unanchored",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Chart x-axis labels are off-centre from their points",
+  "symptom": "The x-axis labels lost their centring transform, so every label starts at its data point instead of being centred under it. The labels look shifted right relative to the data, and the last label hangs past the right end of the plot.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": ".chart__x span { transform: none !important; }",
+  "js": null
+}

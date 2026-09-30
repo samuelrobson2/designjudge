@@ -1,0 +1,21 @@
+{
+  "id": "drawer-peeks-when-closed",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Closed navigation drawer still peeks in from the left",
+  "symptom": "The closed drawer is moved off-screen by a hard-coded 262 px instead of its full 280 px width. An 18 px white strip with a shadow stays visible along the left edge of the screen, covering part of the menu button and the left edge of the content.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": "@media (max-width: 1023px) {\n  .drawer:not(.is-open) { transform: translateX(-262px) !important; }\n}",
+  "js": null
+}

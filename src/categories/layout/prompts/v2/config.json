@@ -1,0 +1,5 @@
+{
+  "description": "Judge-facing rubric (states, criteria and scoring verbatim; diagnostics by name, measure and reference values only); evidence grouped under the criteria it is relevant to.",
+  "rubric": "judge",
+  "packet": { "grouping": "by-criterion" }
+}

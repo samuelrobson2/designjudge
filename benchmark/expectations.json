@@ -1,0 +1,24 @@
+{
+  "note": "Expected outcomes for the benchmark. Never read by collection or the judge; used only by compare.",
+  "cases": {
+    "booking-baseline": { "role": "baseline" },
+    "booking-demoted-cta": {
+      "role": "variant",
+      "baseline": "booking-baseline",
+      "change": "The primary 'Confirm booking' action is removed from the summary panel and the mobile action bar, and placed at the end of the page after a policy block, as a small button following two same-sized secondary buttons. No deterministic check targets this; it tests visual judgment of primary focus and priority.",
+      "expected": "must_drop",
+      "criteria": ["A", "D"],
+      "targets": { "checks": [] }
+    },
+    "dashboard-baseline": { "role": "baseline" },
+    "dashboard-mobile-overflow": {
+      "role": "variant",
+      "baseline": "dashboard-baseline",
+      "change": "On narrow viewports the recent-orders table keeps its desktop form with a 720 px minimum width and no scroll container, so the whole page scrolls horizontally on mobile.",
+      "expected": "must_drop",
+      "criteria": ["C", "D"],
+      "targets": { "checks": [{ "diagId": "page_horizontal_overflow", "stateId": "mobile" }] }
+    },
+    "carsearch-baseline": { "role": "standalone" }
+  }
+}

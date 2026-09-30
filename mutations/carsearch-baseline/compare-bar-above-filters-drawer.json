@@ -1,0 +1,20 @@
+{
+  "id": "compare-bar-above-filters-drawer",
+  "case": "carsearch-baseline",
+  "kind": "defect",
+  "title": "Compare bar sits on top of the filter drawer",
+  "symptom": "The compare bar was given a high z-index. On phones, with cars ticked for comparison, opening the filter drawer leaves the compare bar floating over the drawer and its backdrop, covering the drawer's \"Show N cars\" button.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": "Tick \"Compare\" on two cars, then open Filters"
+  },
+  "severity": "moderate",
+  "css": ".compare-bar { z-index: 40; }",
+  "js": null
+}

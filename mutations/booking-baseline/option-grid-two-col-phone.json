@@ -1,0 +1,20 @@
+{
+  "id": "option-grid-two-col-phone",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Treatment cards stay in two columns on phones",
+  "symptom": "The treatment options keep their two-column grid on phones. Each card is only ~140 px wide, so names, prices and descriptions are crammed and wrap every word or two. With the long (pseudo-localised) strings, words are wider than the card and spill over its border into the neighbouring card.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }\n}",
+  "js": null
+}

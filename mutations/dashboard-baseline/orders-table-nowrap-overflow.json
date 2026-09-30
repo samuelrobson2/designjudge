@@ -1,0 +1,23 @@
+{
+  "id": "orders-table-nowrap-overflow",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Orders table overflows its card at tablet width",
+  "symptom": "Table cells are set to never wrap. With long customer names plus localised dates and headings (stress content), the six-column orders table becomes wider than its card at tablet widths (768 to ~890 px), sticking out of the card and making the whole page scroll sideways by over 100 px, with the Status column off-screen. The same happens again just above 1024 px, where the sidebar returns and narrows the content.",
+  "where": {
+    "viewports": [
+      "tablet"
+    ],
+    "widths": [
+      768,
+      889
+    ],
+    "content": [
+      "stress"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".orders-table th, .orders-table td { white-space: nowrap; }",
+  "js": null
+}

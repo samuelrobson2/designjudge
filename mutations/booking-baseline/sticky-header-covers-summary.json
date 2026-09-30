@@ -1,0 +1,21 @@
+{
+  "id": "sticky-header-covers-summary",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Sticky header hides the top of the sticky summary",
+  "symptom": "The site header was made sticky, but the appointment summary still sticks at 24 px from the top. Once the user scrolls, the summary slides under the header, hiding its \"Your appointment\" heading and first row.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet"
+    ],
+    "widths": [
+      768,
+      1920
+    ],
+    "interaction": "Scroll down the page by ~700 px"
+  },
+  "severity": "moderate",
+  "css": ".site-header { position: sticky; top: 0; z-index: 10; }",
+  "js": null
+}

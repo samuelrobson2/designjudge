@@ -1,0 +1,24 @@
+{
+  "id": "harmless-date-strip-scroller",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Date picker becomes a horizontal scroller on larger screens",
+  "symptom": "On tablet and desktop the dates are shown as a single row that scrolls sideways (as on phones), with a visible scrollbar and the next date partly visible at the edge. With 12 dates it is clearly scrollable; nothing is lost.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet"
+    ],
+    "widths": [
+      768,
+      1920
+    ],
+    "content": [
+      "dense"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": "@media (min-width: 768px) {\n  .date-strip { display: flex !important; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }\n  .date-chip { flex: 0 0 84px; scroll-snap-align: start; }\n  .date-strip::-webkit-scrollbar { height: 8px; }\n  .date-strip::-webkit-scrollbar-track { background: #eef0f3; border-radius: 4px; }\n  .date-strip::-webkit-scrollbar-thumb { background: #b7bec8; border-radius: 4px; }\n}",
+  "js": null
+}

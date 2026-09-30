@@ -1,0 +1,18 @@
+{
+  "id": "chart-y-axis-too-narrow",
+  "case": "dashboard-baseline",
+  "kind": "defect",
+  "title": "Revenue axis labels spill into the chart",
+  "symptom": "The y-axis column of the revenue chart is only 14 px wide. The price labels (\"£1.8k\", \"£45k\") are wider than that and run to the right into the plot area, overlapping the gridlines and the start of the revenue lines.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".chart { grid-template-columns: 14px minmax(0, 1fr) !important; }",
+  "js": null
+}

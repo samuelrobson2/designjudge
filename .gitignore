@@ -1,0 +1,6 @@
+node_modules/
+artifacts/
+mutations/_previews/
+.env
+.DS_Store
+.Rhistory
