@@ -1,6 +1,7 @@
 {
   "id": "dashboard-baseline",
-  "title": "Store sales dashboard — baseline",
+  "title": "Store sales dashboard — original",
+  "summary": "The starting version of the dashboard. The flawed copy and the polished version are both made from it.",
   "request": "Create a dashboard for an online store owner to track this month's revenue and key metrics (orders, average order value, conversion rate), see the revenue trend over time, see top-selling products, and review recent orders.",
   "source": {
     "type": "static",

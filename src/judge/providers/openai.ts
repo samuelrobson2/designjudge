@@ -1,10 +1,50 @@
 import fs from 'node:fs';
+import https from 'node:https';
 import type { JudgeRequest } from '../../categories/layout/prompt.ts';
 import type { CallOptions, Provider, ProviderResult, Usage } from './types.ts';
 
 const ENDPOINT = 'https://api.openai.com/v1/responses';
 const MAX_ATTEMPTS = 4;
 const TIMEOUT_MS = 15 * 60 * 1000;
+
+// Node's fetch negotiates HTTP/2 and, once a shared session breaks, fails every later request
+// on it (ERR_HTTP2_INVALID_SESSION), retries included. Requests go over HTTP/1.1 instead.
+const agent = new https.Agent({ keepAlive: true, maxSockets: 8 });
+
+interface HttpResult {
+  status: number;
+  ok: boolean;
+  retryAfter: string | null;
+  json: any;
+}
+
+function postJson(url: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<HttpResult> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, { method: 'POST', agent, headers: { ...headers, 'content-length': String(Buffer.byteLength(body)) } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('error', reject);
+      res.on('end', () => {
+        clearTimeout(timer);
+        let json: any = null;
+        try {
+          json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        } catch {
+          json = null;
+        }
+        const status = res.statusCode ?? 0;
+        const retryAfter = res.headers['retry-after'];
+        resolve({ status, ok: status >= 200 && status < 300, retryAfter: typeof retryAfter === 'string' ? retryAfter : null, json });
+      });
+    });
+    const timer = setTimeout(() => req.destroy(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs);
+    req.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    req.end(body);
+  });
+}
 
 function buildBody(req: JudgeRequest, opts: CallOptions, detailOverride?: 'high', withSummary = true) {
   const content: unknown[] = [];
@@ -113,21 +153,17 @@ export const openaiProvider: Provider = {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const { body, redacted } = buildBody(req, opts, detailOverride, withSummary);
       const t0 = Date.now();
-      let res: Response;
+      let res: HttpResult;
       try {
-        res = await fetch(ENDPOINT, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
+        res = await postJson(ENDPOINT, { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` }, JSON.stringify(body), TIMEOUT_MS);
       } catch (err) {
-        lastError = `Network error: ${(err as Error).message}`;
+        const code = (err as { code?: string }).code;
+        lastError = `Network error: ${(err as Error).message}${code ? ` (${code})` : ''}`;
         await sleep(2000 * attempt);
         continue;
       }
       const latencyMs = Date.now() - t0;
-      const json: any = await res.json().catch(() => null);
+      const json = res.json;
       if (res.ok && json) {
         const { text, refusal } = extractText(json);
         const status = refusal ? 'refusal' : json.status === 'incomplete' ? 'incomplete' : 'ok';
@@ -157,7 +193,7 @@ export const openaiProvider: Provider = {
         continue;
       }
       if (res.status === 429 || res.status >= 500) {
-        const retryAfter = Number(res.headers.get('retry-after'));
+        const retryAfter = Number(res.retryAfter);
         await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000 * 2 ** (attempt - 1));
         continue;
       }

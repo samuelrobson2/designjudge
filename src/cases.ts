@@ -21,6 +21,8 @@ const stepSchema = z.discriminatedUnion('action', [
 export const manifestSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   title: z.string(),
+  // What this interface is for in the benchmark, for people browsing the viewer (never sent to the judge).
+  summary: z.string().optional(),
   request: z.string().min(1),
   source: z.discriminatedUnion('type', [
     z.object({ type: z.literal('static'), dir: z.string() }),

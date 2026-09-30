@@ -7,7 +7,7 @@ import { layoutCategory } from './definition.ts';
 import { packetVersionFor, type PacketOptions } from './packet.ts';
 import { FINDINGS_RENDER_VERSION, RENDER_VERSION, renderSystem, renderUserParts, type UserPart } from './render.ts';
 import { judgeRubricText, parseLayoutRubric } from './rubric.ts';
-import { layoutOutputJsonSchema } from './schema.ts';
+import { layoutOutputJsonSchema, type SchemaOptions } from './schema.ts';
 
 export interface JudgeImage {
   id: string;
@@ -48,6 +48,13 @@ export interface PromptConfig {
   packet: PacketOptions;
   // Field descriptions in the output schema (they carry the output instructions).
   schemaDescriptions?: boolean;
+  // Whether the judge names the findings that decided the score (default true).
+  decisiveFindings?: boolean;
+  materiality?: SchemaOptions['materiality'];
+  // A file in the prompt folder whose text replaces the rubric's scoring section.
+  scoring?: string;
+  // Findings packets: each measured value as a block shaped like a check issue.
+  measurementBlocks?: boolean;
 }
 
 function promptDir(version: string): string {
@@ -79,16 +86,17 @@ export function buildLayoutRequest(packet: Packet, bundleDirAbs: string, promptV
   }
   const systemTpl = fs.readFileSync(path.join(dir, 'system.md'), 'utf8');
   const userTpl = fs.readFileSync(path.join(dir, 'user.md'), 'utf8');
+  const scoringTpl = config.scoring ? fs.readFileSync(path.join(dir, config.scoring), 'utf8').trim() : undefined;
   const rubricRaw = fs.readFileSync(layoutCategory.rubricPath, 'utf8').trim();
-  const schema = layoutOutputJsonSchema(undefined, { describe: config.schemaDescriptions });
+  const schema = layoutOutputJsonSchema(undefined, { describe: config.schemaDescriptions, decisive: config.decisiveFindings, materiality: config.materiality });
 
   let instructions: string;
   let userText: string;
   let userParts: UserPart[] | undefined;
   if (config.render === 'text') {
     const parsed = parseLayoutRubric(rubricRaw);
-    instructions = renderSystem(systemTpl, parsed);
-    ({ parts: userParts, text: userText } = renderUserParts(userTpl, packet, parsed));
+    instructions = renderSystem(systemTpl, parsed, scoringTpl);
+    ({ parts: userParts, text: userText } = renderUserParts(userTpl, packet, parsed, { measurementBlocks: config.measurementBlocks }));
   } else {
     const rubric = config.rubric === 'judge' ? judgeRubricText() : rubricRaw;
     instructions = systemTpl.replace('{{RUBRIC}}', rubric);
@@ -117,11 +125,12 @@ export function buildLayoutRequest(packet: Packet, bundleDirAbs: string, promptV
   });
 
   const packetHash = sha256(JSON.stringify({ evidence: packet.evidence, images: images.map((i) => [i.id, i.sha256, i.detail]) }));
-  const renderVersion = config.render !== 'text' ? '' : config.packet.evidence === 'findings' ? FINDINGS_RENDER_VERSION : RENDER_VERSION;
+  const renderVersion =
+    config.render !== 'text' ? '' : config.packet.evidence === 'findings' ? FINDINGS_RENDER_VERSION + (config.measurementBlocks ? '+measurement-blocks' : '') : RENDER_VERSION;
   return {
     category: 'layout',
     promptVersion,
-    promptHash: sha256(systemTpl + '\n---\n' + userTpl + '\n---\n' + JSON.stringify(schema) + renderVersion).slice(0, 16),
+    promptHash: sha256(systemTpl + '\n---\n' + userTpl + '\n---\n' + JSON.stringify(schema) + renderVersion + (scoringTpl ?? '')).slice(0, 16),
     rubricHash: sha256(rubric).slice(0, 16),
     packetHash: packetHash.slice(0, 16),
     instructions,

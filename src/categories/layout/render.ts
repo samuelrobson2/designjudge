@@ -2,8 +2,9 @@
 // prompt, and a user message that reads in order — task, states, screenshots, then each
 // criterion with its evidence placed directly beneath it.
 
-import type { Packet } from '../types.ts';
+import type { Packet, PacketImage } from '../types.ts';
 import type { CheckBlock, FindingLine, FindingsCriterion, FindingsState, ObservationBlock } from './findings.ts';
+import { lineVisibleIn } from './marks.ts';
 import { rubricStateName, type ParsedRubric } from './rubric.ts';
 
 // Bump when rendering changes, so the prompt hash changes with it.
@@ -272,10 +273,27 @@ function observationLines(b: ObservationBlock): string[] {
   ];
 }
 
-export function renderFindingsCriterion(c: FindingsCriterion, rubric: ParsedRubric): string {
+// The same layout as a check issue: one block per value, with what, where and which screenshots show it.
+function measuredValueBlock(l: FindingLine, images: PacketImage[]): string[] {
+  const inShots = images.filter((img) => lineVisibleIn(l, img)).map((img) => img.id);
+  const shots = inShots.length ? inShots.join(', ') : l.located ? 'none show it' : 'none; it is measured across widths';
+  return [`  Value (cite ${l.ids[0]})`, `    What was measured: ${l.text}`, `    Where: ${l.where}.`, `    Screenshots: ${shots}.`];
+}
+
+function observationBlockLines(b: ObservationBlock, images: PacketImage[]): string[] {
+  return ['', `Measurement: ${b.observation}. It measures ${b.measures}.`, `  Rubric reference: ${b.reference}`, ...b.lines.flatMap((l) => measuredValueBlock(l, images))];
+}
+
+export interface FindingsRenderOptions {
+  // Measurements as blocks shaped like check issues; needs the packet's images.
+  measurementBlocks?: { images: PacketImage[] };
+}
+
+export function renderFindingsCriterion(c: FindingsCriterion, rubric: ParsedRubric, opts: FindingsRenderOptions = {}): string {
   const def = rubric.criteria.find((x) => x.id === c.criterion)!;
   const checks = c.checks.flatMap(checkLines);
-  const observations = c.observations.flatMap(observationLines);
+  const blocks = opts.measurementBlocks;
+  const observations = c.observations.flatMap((b) => (blocks ? observationBlockLines(b, blocks.images) : observationLines(b)));
   return [
     `<criterion id="${c.criterion}" name="${c.name}">`,
     '<rubric_criterion>',
@@ -314,13 +332,19 @@ export function renderFindingsStates(states: FindingsState[]): string {
     .join('\n');
 }
 
-export function renderUserParts(template: string, packet: Packet, rubric: ParsedRubric): { parts: UserPart[]; text: string } {
+export function renderUserParts(
+  template: string,
+  packet: Packet,
+  rubric: ParsedRubric,
+  opts: { measurementBlocks?: boolean } = {},
+): { parts: UserPart[]; text: string } {
   const evidence = packet.evidence as Record<string, any>;
   const findings = evidence.format === 'findings';
   const labels = new Map<string, string>(((evidence.states ?? []) as EvState[]).map((s) => [s.state, s.label]));
   const stateLabel = (id: string) => labels.get(id) ?? id;
+  const findingsOpts: FindingsRenderOptions = opts.measurementBlocks ? { measurementBlocks: { images: packet.images } } : {};
   const criteria = findings
-    ? ((evidence.criteria ?? []) as FindingsCriterion[]).map((c) => renderFindingsCriterion(c, rubric)).join('\n\n')
+    ? ((evidence.criteria ?? []) as FindingsCriterion[]).map((c) => renderFindingsCriterion(c, rubric, findingsOpts)).join('\n\n')
     : ((evidence.criteria ?? []) as EvCriterion[]).map((c) => renderCriterion(c, rubric, stateLabel)).join('\n\n');
   const remaining = ((evidence.selection_notes ?? []) as string[]).filter((n) => findings || !NOTES_COVERED.some((re) => re.test(n)));
   const notes = remaining.length ? `\n<notes>\n${remaining.map((n) => `- ${n}`).join('\n')}\n</notes>\n` : '';
@@ -346,10 +370,11 @@ export function renderUserParts(template: string, packet: Packet, rubric: Parsed
   return { parts, text };
 }
 
-export function renderSystem(template: string, rubric: ParsedRubric): string {
+// `scoring` replaces the rubric's scoring section (intro and anchors) for prompt versions that trial other anchors.
+export function renderSystem(template: string, rubric: ParsedRubric, scoring?: string): string {
   const anchors = rubric.anchors.map((a) => `- ${a.score} · ${a.label}: ${a.text}`).join('\n');
   return template
     .replace('{{MEASURES}}', rubric.measures.replace(/\*\*/g, ''))
     .replace('{{ASSESSMENT_RULES}}', rubric.criteriaPreamble.replace(/\*\*/g, ''))
-    .replace('{{SCORING}}', `${rubric.scoringIntro}\n\n${anchors}`);
+    .replace('{{SCORING}}', scoring ?? `${rubric.scoringIntro}\n\n${anchors}`);
 }

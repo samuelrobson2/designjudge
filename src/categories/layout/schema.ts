@@ -12,7 +12,8 @@ function obj(properties: Record<string, unknown>) {
 // prompt need not spell out the output format.
 type Describe = (text: string) => { description?: string };
 
-function criterionJsonSchema(c: CriterionDef, d: Describe) {
+function criterionJsonSchema(c: CriterionDef, d: Describe, materiality: keyof typeof MATERIALITY) {
+  const m = d(MATERIALITY[materiality]);
   return {
     ...obj({
       summary: { ...str, ...d('A short summary of your assessment of this criterion.') },
@@ -26,12 +27,12 @@ function criterionJsonSchema(c: CriterionDef, d: Describe) {
       },
       findings: {
         type: 'array',
-        ...d("The material strengths, weaknesses and missed opportunities for this criterion."),
+        ...d(materiality === 'v4' ? 'The material strengths, weaknesses and missed opportunities for this criterion.' : 'The strengths, weaknesses and missed opportunities for this criterion, material or minor.'),
         items: obj({
           id: { ...str, ...d(`Unique finding ID: the criterion letter and a number, such as ${c.id}1, ${c.id}2.`) },
           evaluation_point: { type: 'string', enum: c.points.map((p) => p.key) },
           polarity: { type: 'string', enum: ['strength', 'weakness', 'missed_opportunity'] },
-          materiality: { type: 'string', enum: ['material', 'minor'], ...d('material if it affects how easily the primary task is understood or carried out; otherwise minor.') },
+          materiality: { type: 'string', enum: ['material', 'minor'], ...m },
           observation: { ...str, ...d('What you observed.') },
           why_it_matters: { ...str, ...d('Why it matters for the task.') },
           evidence_refs: { type: 'array', items: str, ...d('At least one evidence ID that supports the finding (S-…, F-…, O-…), exactly as given.') },
@@ -43,12 +44,25 @@ function criterionJsonSchema(c: CriterionDef, d: Describe) {
   };
 }
 
+export const MATERIALITY = {
+  v4: 'material if it affects how easily the primary task is understood or carried out; otherwise minor.',
+  v5: 'material if a user doing the primary task would notice the difference: fixing the weakness, or losing the strength, would change how easily the task is understood or completed. minor if it is localized or cosmetic and would not change that.',
+};
+
+export interface SchemaOptions {
+  describe?: boolean;
+  // Ask the judge to name the findings that decided the score.
+  decisive?: boolean;
+  materiality?: keyof typeof MATERIALITY;
+}
+
 // Strict-mode JSON Schema: every object closed, every property required.
-export function layoutOutputJsonSchema(criteria: CriterionDef[] = LAYOUT_CRITERIA, opts: { describe?: boolean } = {}) {
+export function layoutOutputJsonSchema(criteria: CriterionDef[] = LAYOUT_CRITERIA, opts: SchemaOptions = {}) {
   const d: Describe = (text) => (opts.describe ? { description: text } : {});
+  const decisive = opts.decisive ?? true;
   const ids = criteria.map((c) => c.id);
   return obj({
-    criteria: obj(Object.fromEntries(criteria.map((c) => [c.id, criterionJsonSchema(c, d)]))),
+    criteria: obj(Object.fromEntries(criteria.map((c) => [c.id, criterionJsonSchema(c, d, opts.materiality ?? 'v4')]))),
     missing_evidence: {
       type: 'array',
       ...d('Anything you needed to judge a point but could not see. Leave empty if nothing was missing.'),
@@ -66,7 +80,7 @@ export function layoutOutputJsonSchema(criteria: CriterionDef[] = LAYOUT_CRITERI
     overall: obj({
       score: { type: 'integer', enum: LAYOUT_ANCHORS.map((a) => a.score), ...d('The holistic Layout score, 1 to 5.') },
       anchor: { type: 'string', enum: LAYOUT_ANCHORS.map((a) => a.label), ...d('The scoring anchor label that matches the score.') },
-      decisive_finding_ids: { type: 'array', items: str, ...d('The IDs of the findings that decided the score.') },
+      ...(decisive ? { decisive_finding_ids: { type: 'array', items: str, ...d('The IDs of the findings that decided the score.') } } : {}),
       reasoning: { ...str, ...d('Why this score.') },
     }),
   });
@@ -105,7 +119,7 @@ export function layoutOutputZod(criteria: CriterionDef[] = LAYOUT_CRITERIA) {
     overall: z.strictObject({
       score: z.number().int().min(1).max(5),
       anchor: z.enum(LAYOUT_ANCHORS.map((a) => a.label) as [string, ...string[]]),
-      decisive_finding_ids: z.array(z.string()),
+      decisive_finding_ids: z.array(z.string()).optional(),
       reasoning: z.string(),
     }),
   });
@@ -129,5 +143,5 @@ export interface LayoutJudgment {
   >;
   missing_evidence: { evidence: string; affected_criteria: string[]; effect_on_assessment: string }[];
   untrusted_content_notes: string[];
-  overall: { score: number; anchor: string; decisive_finding_ids: string[]; reasoning: string };
+  overall: { score: number; anchor: string; decisive_finding_ids?: string[]; reasoning: string };
 }

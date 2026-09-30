@@ -31,6 +31,18 @@ describe('Output schema', () => {
       if (node && node.type === 'array') walk(node.items, `${path}[]`);
     };
     walk(layoutOutputJsonSchema(), '$');
+    walk(layoutOutputJsonSchema(undefined, { describe: true, decisive: false, materiality: 'v5' }), '$');
+  });
+
+  it('asks for decisive findings unless turned off, and describes materiality per version', () => {
+    const overall = (s: any) => Object.keys(s.properties.overall.properties);
+    const materiality = (s: any) => s.properties.criteria.properties.A.properties.findings.items.properties.materiality.description;
+    const v4 = layoutOutputJsonSchema(undefined, { describe: true });
+    const v5 = layoutOutputJsonSchema(undefined, { describe: true, decisive: false, materiality: 'v5' });
+    expect(overall(v4)).toContain('decisive_finding_ids');
+    expect(overall(v5)).not.toContain('decisive_finding_ids');
+    expect(materiality(v4)).toMatch(/^material if it affects/);
+    expect(materiality(v5)).toMatch(/notice the difference/);
   });
 });
 

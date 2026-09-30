@@ -126,10 +126,12 @@ For each criterion:
 
 - Assess every listed evaluation point that is applicable.
 - Identify both positive design qualities and weaknesses or missed opportunities.
-- For every material positive or negative finding, cite the observable evidence and explain why it matters to that criterion.
+- For every finding, cite the observable evidence, explain why it matters to that criterion, and label it material or minor:
+  - **Material:** a user doing the primary task would notice the difference. Fixing the weakness, or losing the strength, would change how easily the task is understood or completed.
+  - **Minor:** localized or cosmetic. It would not change how easily the primary task is understood or completed.
 - Passing deterministic checks demonstrates technical robustness, not good composition. Evaluate the quality of the composition, not the absence of defects.
 - Treat quantitative observations as evidence to interpret, not as automatic violations. Do not infer a weakness from a metric alone.
-- Assign each material finding to the criterion it most directly affects. You may reference consequences in other criteria, but do not count the same underlying issue as separate evidence multiple times.
+- Assign each finding to the criterion it most directly affects. You may reference consequences in other criteria, but do not count the same underlying issue as separate evidence multiple times.
 - Do not assign numeric scores to individual criteria.
 
 ++**A/ Hierarchy and Grouping**++
@@ -211,7 +213,7 @@ Use the criterion findings as evidence to make one holistic judgment about the L
 
 Consider which strengths and weaknesses are most consequential to the requested task, how they interact, and whether they reinforce or undermine the overall composition. Do not average criterion findings, give each criterion equal weight, or determine the score by counting positive or negative findings.
 
-Select the 1–5 anchor that best characterizes the overall quality of the Layout, and explain which criterion findings were decisive to that judgment.
+Select the 1–5 anchor that best characterizes the overall quality of the Layout, and explain which findings led to it.
 
 
 |                     |                                                                                                                                                                                                                                                                                                                 |

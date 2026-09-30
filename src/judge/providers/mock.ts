@@ -25,6 +25,11 @@ const CHECK_POINT: Record<string, string> = {
   responsive_layout_failures: 'adaptive_behavior',
 };
 
+function asksDecisive(schema: object | undefined): boolean {
+  const overall = (schema as { properties?: { overall?: { properties?: Record<string, unknown> } } } | undefined)?.properties?.overall?.properties;
+  return !overall || 'decisive_finding_ids' in overall;
+}
+
 export function mockProvider(mode: 'ok' | 'invalid_json' | 'unknown_refs'): Provider {
   return {
     name: 'mock',
@@ -79,7 +84,9 @@ export function mockProvider(mode: 'ok' | 'invalid_json' | 'unknown_refs'): Prov
         overall: {
           score,
           anchor: LAYOUT_ANCHORS.find((a) => a.score === score)!.label,
-          decisive_finding_ids: Object.values(criteria).flatMap((c) => c.findings.filter((f) => f.polarity === 'weakness').map((f) => f.id)).slice(0, 3),
+          ...(asksDecisive(req.schema)
+            ? { decisive_finding_ids: Object.values(criteria).flatMap((c) => c.findings.filter((f) => f.polarity === 'weakness').map((f) => f.id)).slice(0, 3) }
+            : {}),
           reasoning: `[MOCK] Score = 4 minus the number of distinct failing check types (${failedTypes.size}). Not a real judgment.`,
         },
       };

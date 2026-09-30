@@ -1,6 +1,7 @@
 {
   "id": "booking-baseline",
-  "title": "Physio booking — baseline",
+  "title": "Physio booking — original",
+  "summary": "The starting version of the booking page. The flawed copy is made from it, so the judge should score this one higher.",
   "request": "Build a web page where patients of a physiotherapy clinic can book an appointment: choose a treatment, pick a practitioner, choose an available date and time, enter their details, and confirm the booking.",
   "source": {
     "type": "static",

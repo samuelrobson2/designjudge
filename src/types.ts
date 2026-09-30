@@ -28,6 +28,7 @@ export interface InteractiveStateSpec {
 export interface CaseManifest {
   id: string;
   title: string;
+  summary?: string;
   request: string;
   source: { type: 'static'; dir: string } | { type: 'url'; url: string };
   entry?: string;

@@ -174,7 +174,7 @@ export function summaryRow(
     j ? findings.filter((f) => f.polarity === 'strength').length : null,
     j ? findings.filter((f) => f.polarity !== 'strength').length : null,
     j ? findings.filter((f) => f.polarity !== 'strength' && f.materiality === 'material').length : null,
-    j?.output?.overall.decisive_finding_ids.join(' ') ?? '', j?.output?.overall.reasoning ?? '',
+    j?.output?.overall.decisive_finding_ids?.join(' ') ?? '', j?.output?.overall.reasoning ?? '',
     ...LAYOUT_CRITERIA.map((c) => j?.output?.criteria[c.id]?.summary ?? ''),
     j?.output?.missing_evidence.map((m) => `${m.evidence} (${m.affected_criteria.join(', ')}): ${m.effect_on_assessment}`).join(' | ') ?? '',
     j?.output?.untrusted_content_notes.join(' | ') ?? '',

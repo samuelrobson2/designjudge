@@ -1,6 +1,7 @@
 {
   "id": "booking-demoted-cta",
-  "title": "Physio booking — variant (hidden change)",
+  "title": "Physio booking — flawed copy",
+  "summary": "A copy of the original with one layout problem added on purpose. The judge is not told what changed; it should score this lower than the original.",
   "request": "Build a web page where patients of a physiotherapy clinic can book an appointment: choose a treatment, pick a practitioner, choose an available date and time, enter their details, and confirm the booking.",
   "source": {
     "type": "static",

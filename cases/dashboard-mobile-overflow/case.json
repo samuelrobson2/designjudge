@@ -1,6 +1,7 @@
 {
   "id": "dashboard-mobile-overflow",
-  "title": "Store sales dashboard — variant (hidden change)",
+  "title": "Store sales dashboard — flawed copy",
+  "summary": "A copy of the original with one layout problem added on purpose. The judge is not told what changed; it should score this lower than the original.",
   "request": "Create a dashboard for an online store owner to track this month's revenue and key metrics (orders, average order value, conversion rate), see the revenue trend over time, see top-selling products, and review recent orders.",
   "source": {
     "type": "static",

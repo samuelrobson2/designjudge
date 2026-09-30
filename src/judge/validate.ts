@@ -42,7 +42,9 @@ export function parseOutput(text: string | null): { value: unknown; error?: stri
   }
 }
 
-export function validateJudgment(value: unknown, packet: Packet): { output: LayoutJudgment | null; validation: Validation } {
+// `requireEvidence: false` (human ratings) allows findings that cite no evidence ID.
+export function validateJudgment(value: unknown, packet: Packet, opts: { requireEvidence?: boolean } = {}): { output: LayoutJudgment | null; validation: Validation } {
+  const requireEvidence = opts.requireEvidence ?? true;
   const empty = { findings: 0, strengths: 0, weaknesses: 0, missedOpportunities: 0, material: 0, refs: 0, validRefs: 0, findingsWithValidRef: 0, missingEvidenceNotes: 0 };
   const parsed = layoutOutputZod().safeParse(value);
   if (!parsed.success) {
@@ -78,7 +80,7 @@ export function validateJudgment(value: unknown, packet: Packet): { output: Layo
       if (f.materiality === 'material') stats.material++;
       if (seen.has(f.id)) refIssues.push({ findingId: f.id, problem: 'duplicate_finding_id', severity: 'error' });
       seen.add(f.id);
-      if (!f.evidence_refs.length) refIssues.push({ findingId: f.id, problem: 'no_evidence', severity: 'error' });
+      if (requireEvidence && !f.evidence_refs.length) refIssues.push({ findingId: f.id, problem: 'no_evidence', severity: 'error' });
       let anyValid = false;
       for (const ref of f.evidence_refs) {
         stats.refs++;
@@ -103,13 +105,14 @@ export function validateJudgment(value: unknown, packet: Packet): { output: Layo
       }
     }
   }
-  for (const id of output.overall.decisive_finding_ids) {
+  const decisive = output.overall.decisive_finding_ids;
+  for (const id of decisive ?? []) {
     if (!seen.has(id)) otherIssues.push(`Decisive finding "${id}" does not exist.`);
   }
   const anchor = LAYOUT_ANCHORS.find((a) => a.score === output.overall.score);
   if (anchor && anchor.label !== output.overall.anchor) {
     otherIssues.push(`Score ${output.overall.score} does not match anchor "${output.overall.anchor}" (expected "${anchor.label}").`);
   }
-  if (!output.overall.decisive_finding_ids.length) otherIssues.push('No decisive findings named.');
+  if (decisive && !decisive.length) otherIssues.push('No decisive findings named.');
   return { output, validation: { schemaValid: true, schemaErrors: [], refIssues, otherIssues, stats } };
 }

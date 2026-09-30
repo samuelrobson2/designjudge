@@ -1,6 +1,7 @@
 {
   "id": "carsearch-baseline",
-  "title": "Used car search — baseline (no component annotations)",
+  "title": "Used car search — standalone",
+  "summary": "A separate interface with no copies to compare against. Its code does not label its components, so the automated checks work from the page structure alone.",
   "request": "Build a page to browse used cars for sale near the user, filter them by price, make, mileage and fuel type, sort the results, and compare listings to find a good deal.",
   "source": {
     "type": "static",

@@ -558,14 +558,16 @@ export async function collectCase(manifest: CaseManifest, opts: CollectOptions =
   let server: StaticServer | null = null;
   let baseUrl: string;
   let inputsHash: string;
+  // Display-only fields are left out, so renaming a case does not change its interface ID.
+  const { title: _title, summary: _summary, ...hashedManifest } = manifest;
   if (manifest.source.type === 'static') {
     const siteDir = path.join(dir, manifest.source.dir);
     server = await serveStatic(siteDir);
     baseUrl = server.url;
-    inputsHash = sha256(hashDir(siteDir) + JSON.stringify(manifest) + COLLECTOR_VERSION);
+    inputsHash = sha256(hashDir(siteDir) + JSON.stringify(hashedManifest) + COLLECTOR_VERSION);
   } else {
     baseUrl = manifest.source.url;
-    inputsHash = sha256(manifest.source.url + JSON.stringify(manifest) + COLLECTOR_VERSION);
+    inputsHash = sha256(manifest.source.url + JSON.stringify(hashedManifest) + COLLECTOR_VERSION);
   }
   const url = new URL(manifest.entry ?? '/', baseUrl).toString();
   const origin = new URL(url).origin;

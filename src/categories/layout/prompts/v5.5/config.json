@@ -1,0 +1,14 @@
+{
+  "description": "Trial of sharper anchors: v5 with a replacement scoring section. Each anchor states the conditions its findings must meet, by what the most serious material weakness affects (the primary task or a secondary part) and where it occurs (a baseline state or only an edge state). With no material weakness, strengths decide between 4 and 5. The rubric files are unchanged.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "screenshots": "essential",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "scoring": "scoring.md"
+}

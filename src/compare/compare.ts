@@ -190,7 +190,7 @@ function writeCsvs(runId: string) {
   }
   for (const j of judgments) {
     if (!j.output) continue;
-    const decisive = new Set(j.output.overall.decisive_finding_ids);
+    const decisive = new Set(j.output.overall.decisive_finding_ids ?? []);
     for (const c of LAYOUT_CRITERIA) {
       for (const f of j.output.criteria[c.id].findings) {
         const issues = (j.validation?.refIssues ?? []).filter((i) => i.findingId === f.id).map((i) => `${i.problem}${i.ref ? `:${i.ref}` : ''}`);

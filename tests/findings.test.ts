@@ -334,3 +334,25 @@ describe('Findings marked on screenshots (v4)', () => {
     for (const img of packet.images.filter((i) => i.marks?.length)) expect(img.caption).toMatch(/Red outlines mark where automated checks failed: issues? \d/);
   });
 });
+
+describe('Measurements laid out like check issues (v6)', () => {
+  const v6 = renderUserParts(fs.readFileSync(path.join(dir, 'user.md'), 'utf8'), packet, parsed, { measurementBlocks: true }).text;
+  const v6Lines = v6.split('\n');
+  const valueBlocks = v6Lines.flatMap((l, i) => (/^  Value \(cite O-/.test(l) ? [v6Lines.slice(i, i + 4)] : []));
+
+  it('gives every measured value its own block with what, where and screenshots, like a check issue', () => {
+    expect(valueBlocks).toHaveLength(measurementLines.length);
+    for (const [, what, where, shots] of valueBlocks) {
+      expect(what).toMatch(/^    What was measured: /);
+      expect(where).toMatch(/^    Where: /);
+      expect(shots).toMatch(/^    Screenshots: (S-[\w-]+(, S-[\w-]+)*|none show it|none; it is measured across widths)\.$/);
+    }
+    expect(v6).not.toMatch(/^  - \(cite O-/m);
+    expect(valueBlocks.some(([, , , s]) => /S-desktop-full/.test(s))).toBe(true);
+  });
+
+  it('leaves the checks and the rest of the message as in v4', () => {
+    const withoutMeasurements = (t: string) => t.replace(/Measurement: [\s\S]*?(?=\n\n(?:Measurement:|<\/evidence>)|\n<\/evidence>)/g, '');
+    expect(withoutMeasurements(v6)).toBe(withoutMeasurements(text));
+  });
+});

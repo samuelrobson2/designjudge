@@ -1,6 +1,7 @@
 {
   "id": "dashboard-gold",
-  "title": "Store sales dashboard — gold (ceiling test)",
+  "title": "Store sales dashboard — polished version",
+  "summary": "The original, carefully improved to be as good as we could make it. Tests whether the judge gives a top score to a very good layout.",
   "request": "Create a dashboard for an online store owner to track this month's revenue and key metrics (orders, average order value, conversion rate), see the revenue trend over time, see top-selling products, and review recent orders.",
   "source": {
     "type": "static",

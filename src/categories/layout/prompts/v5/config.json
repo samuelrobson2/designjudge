@@ -1,0 +1,13 @@
+{
+  "description": "v4 without decisive findings: the judge no longer names which findings decided the score, and material and minor have a tighter definition (would a user doing the primary task notice the difference?).",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "screenshots": "essential",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5"
+}

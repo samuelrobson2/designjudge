@@ -1,0 +1,14 @@
+{
+  "description": "v5 with measurements laid out like check issues: each measured value is its own block with an ID to cite, what was measured, where, and which screenshots show it.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "screenshots": "essential",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

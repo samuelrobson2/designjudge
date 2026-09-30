@@ -10,7 +10,9 @@ import { loadExpectations, loadRun, summariseRun } from '../compare/compare.ts';
 import { resolveInside, sendFile } from '../collect/server.ts';
 import { DIAG_NAMES } from '../diagnostics/run.ts';
 import { LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
+import { parseLayoutRubric } from '../categories/layout/rubric.ts';
 import { bundleDir, listBundles, listRuns, loadBundle, loadDiagnostics, runDir } from '../store.ts';
+import { deleteRating, HUMAN_DIR, listRatings, loadRating, saveRating } from '../human/store.ts';
 import { log, readJson } from '../util.ts';
 
 const PUBLIC_DIR = path.join(ROOT, 'src/viewer/public');
@@ -29,6 +31,7 @@ function caseSummary(caseId: string) {
     const diags = loadDiagnostics(bundle);
     latest = {
       bundleId: bundle.bundleId,
+      interfaceId: bundle.interfaceId,
       createdAt: bundle.createdAt,
       collected: bundle.states.filter((s) => s.status === 'collected').length,
       errors: bundle.states.filter((s) => s.status === 'error').length,
@@ -39,13 +42,56 @@ function caseSummary(caseId: string) {
   return {
     caseId,
     title: manifest.title,
+    summary: manifest.summary ?? null,
     request: manifest.request,
     codeDir: path.relative(ROOT, caseDir(caseId)),
     interactiveStates: manifest.interactiveStates?.map((s) => ({ id: s.id, description: s.description })) ?? [],
     fixtures: manifest.fixtures?.supported ?? [],
     bundles,
     latest,
+    humanRatings: listRatings(caseId).map((r) => ({ rater: r.rater, bundleId: r.bundleId })),
   };
+}
+
+function readBody(req: http.IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('error', reject);
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null'));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+// Every judge score for one interface, per run, with the evidence bundle each run judged.
+function judgeScores(caseId: string) {
+  return listRuns().flatMap((id) => {
+    const reqFile = path.join(runDir(id), 'requests', `${caseId}.json`);
+    if (!fs.existsSync(reqFile)) return [];
+    try {
+      const { run, judgments } = loadRun(id);
+      if (run.provider === 'mock') return [];
+      const js = judgments.filter((j) => j.caseId === caseId);
+      return [
+        {
+          runId: id,
+          createdAt: run.createdAt,
+          model: run.model,
+          promptVersion: run.promptVersion,
+          label: run.label ?? '',
+          bundleId: readJson<{ bundleId: string }>(reqFile).bundleId,
+          scores: js.map((j) => j.output?.overall.score ?? null),
+        },
+      ];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function listCodeFiles(caseId: string) {
@@ -71,7 +117,23 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   try {
     if (parts[0] === 'api') {
       const [, kind, a, b, c] = parts;
-      if (kind === 'meta') return json(res, { diagNames: DIAG_NAMES, criteria: LAYOUT_CRITERIA, promptVersions: listPromptVersions() });
+      if (kind === 'meta') {
+        const rubric = parseLayoutRubric();
+        return json(res, {
+          diagNames: DIAG_NAMES,
+          criteria: LAYOUT_CRITERIA.map((c) => {
+            const section = rubric.criteria.find((s) => s.id === c.id);
+            return {
+              ...c,
+              statement: section?.statement ?? '',
+              points: c.points.map((p) => ({ ...p, definition: section?.points.find((x) => x.name === p.name)?.definition ?? '' })),
+            };
+          }),
+          promptVersions: listPromptVersions(),
+          // Versions the step-by-step rating form supports (findings evidence).
+          ratingVersions: listPromptVersions().filter((v) => promptConfig(v).packet.evidence === 'findings'),
+        });
+      }
       if (kind === 'cases') return json(res, listCases().map(caseSummary));
       if (kind === 'checkmarks' && a) {
         const bundle = loadBundle(a, b);
@@ -96,8 +158,46 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         const request = buildLayoutRequest(packet, bundleDir(a, bundle.bundleId), version);
         return json(res, {
           ...request,
+          bundleId: bundle.bundleId,
+          request: packet.request,
+          evidenceIndex: packet.index,
           promptDescription: promptConfig(version).description,
           images: request.images.map((i) => ({ ...i, path: path.relative(EVIDENCE_DIR, i.path) })),
+        });
+      }
+      if (kind === 'human' && a) {
+        if (req.method === 'POST' && !b) {
+          const result = await saveRating(a, (await readBody(req)) as Parameters<typeof saveRating>[1]);
+          return json(res, result, result.errors ? 400 : 200);
+        }
+        if (req.method === 'DELETE' && b) {
+          deleteRating(a, b);
+          return json(res, { ok: true });
+        }
+        if (b) {
+          const rating = loadRating(a, b);
+          const bundle = loadBundle(a, rating.bundleId);
+          const packet = loadOrBuildPacket(bundle, rating.promptVersion);
+          await ensureMarkedScreenshots(packet, bundleDir(a, bundle.bundleId));
+          const request = buildLayoutRequest(packet, bundleDir(a, bundle.bundleId), rating.promptVersion);
+          return json(res, {
+            rating,
+            request: { ...request, evidenceIndex: packet.index, images: request.images.map((i) => ({ ...i, path: path.relative(EVIDENCE_DIR, i.path) })) },
+          });
+        }
+        return json(res, {
+          latestBundleId: listBundles(a).length ? loadBundle(a).bundleId : null,
+          ratings: listRatings(a).map((r) => ({
+            ratingId: r.ratingId,
+            rater: r.rater,
+            createdAt: r.createdAt,
+            bundleId: r.bundleId,
+            promptVersion: r.promptVersion,
+            durationMs: r.durationMs,
+            score: r.output.overall.score,
+            anchor: r.output.overall.anchor,
+          })),
+          judge: judgeScores(a),
         });
       }
       if (kind === 'runs') {
@@ -145,6 +245,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
 
     if (parts[0] === 'files' && parts[1] === 'evidence') {
       const file = resolveInside(EVIDENCE_DIR, '/' + parts.slice(2).join('/'));
+      if (!file) return json(res, { error: 'Forbidden' }, 403);
+      return sendFile(res, file);
+    }
+    if (parts[0] === 'files' && parts[1] === 'human') {
+      const file = resolveInside(HUMAN_DIR, '/' + parts.slice(2).join('/'));
       if (!file) return json(res, { error: 'Forbidden' }, 403);
       return sendFile(res, file);
     }
