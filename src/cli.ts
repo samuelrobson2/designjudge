@@ -30,6 +30,8 @@ Usage:
   npm run report   -- [caseId ...] [--prompt <version>]  Write summary.csv and checks.csv for the latest evidence (no judge run) to artifacts/reports/latest
   npm run compare  -- <runId> [runId ...]     Summarise runs (stability, pair deltas, validity, cost) and write summary.csv, checks.csv and findings.csv
   npm run view     -- [--port 4600]           Open the web viewer
+  npm run publish  -- [--build-only]          Build the hosted rating site from the latest evidence and deploy it to Vercel
+  npm run human-csvs                          Rewrite benchmark/human/*.csv from the rating files (e.g. after git pull brings in hosted ratings)
 `;
 
 async function resolveCases(ids: string[]): Promise<string[]> {
@@ -58,6 +60,7 @@ async function main() {
       only: { type: 'string' },
       dir: { type: 'string' },
       rescore: { type: 'string' },
+      'build-only': { type: 'boolean', default: false },
     },
   });
 
@@ -120,6 +123,18 @@ async function main() {
     case 'view': {
       const { startViewer } = await import('./viewer/server.ts');
       await startViewer(parseInt(values.port!, 10));
+      break;
+    }
+    case 'publish': {
+      const { buildHostedSite, deployHostedSite } = await import('./hosted/publish.ts');
+      await buildHostedSite();
+      if (!values['build-only']) deployHostedSite();
+      break;
+    }
+    case 'human-csvs': {
+      const { HUMAN_DIR, listRatings, writeHumanCsvs } = await import('./human/store.ts');
+      writeHumanCsvs();
+      log(`ratings.csv, findings.csv and points.csv written to ${path.relative(process.cwd(), HUMAN_DIR)} (${listRatings().length} ratings)`);
       break;
     }
     default:

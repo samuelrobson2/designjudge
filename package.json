@@ -13,6 +13,8 @@
     "mutate": "node --import tsx src/cli.ts mutate",
     "compare": "node --import tsx src/cli.ts compare",
     "view": "node --import tsx src/cli.ts view",
+    "publish": "node --import tsx src/cli.ts publish",
+    "human-csvs": "node --import tsx src/cli.ts human-csvs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

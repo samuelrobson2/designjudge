@@ -27,8 +27,17 @@ function h(tag, attrs, ...children) {
 const mount = (el, ...children) => el.replaceChildren(h('div', { style: { display: 'contents' } }, ...children));
 const add = (el, ...children) => el.append(h('div', { style: { display: 'contents' } }, ...children));
 
+// On the hosted rating site everything except ratings is a static snapshot under /data.
+const HOSTED = !!window.DJ_HOSTED;
+function apiUrl(path) {
+  if (!HOSTED || path.startsWith('human/')) return '/api/' + path;
+  const [p, q] = path.split('?');
+  const v = new URLSearchParams(q ?? '').get('version');
+  return `/data/${p}${v ? `.${v}` : ''}.json`;
+}
+
 async function api(path) {
-  const res = await fetch('/api/' + path);
+  const res = await fetch(apiUrl(path));
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
@@ -520,7 +529,15 @@ function inputStrip(input) {
 async function renderHome() {
   const [cases, runs] = await Promise.all([api('cases'), api('runs')]);
   mount($app,
-    h('div', { class: 'section-title' }, h('h1', {}, 'Test Interfaces'), h('span', { class: 'count' }, cases.length)),
+    HOSTED
+      ? h(
+          'div',
+          { class: 'page-head' },
+          h('h1', {}, 'Rate these interfaces'),
+          h('p', {}, 'Each interface was built from a short prompt. Pick one, look through its screenshots and give its layout a score from 1 to 5. Ratings are public and show the name you enter.'),
+        )
+      : null,
+    h('div', { class: 'section-title' }, h(HOSTED ? 'h2' : 'h1', {}, 'Test Interfaces'), h('span', { class: 'count' }, cases.length)),
     h(
       'div',
       { class: 'cards' },
@@ -540,7 +557,7 @@ async function renderHome() {
         ),
       ),
     ),
-    h('div', { class: 'section-title' }, h('h1', {}, 'Judge runs'), h('span', { class: 'count' }, runs.length)),
+    h('div', { class: 'section-title' }, h(HOSTED ? 'h2' : 'h1', {}, 'Judge runs'), h('span', { class: 'count' }, runs.length)),
     runs.length
       ? h(
           'div',
@@ -575,10 +592,13 @@ async function renderHome() {
 // ---------- Interface ----------
 
 async function renderCase(caseId, tab, version) {
-  const data = await api(`case/${caseId}`);
+  const [data, human] = await Promise.all([
+    api(`case/${caseId}`),
+    api(`human/${caseId}`).catch((err) => ({ error: err.message, latestBundleId: null, ratings: [], judge: [] })),
+  ]);
   const { summary, bundle } = data;
   const tabs = [
-    ['human', `Human ratings (${summary.humanRatings?.length ?? 0})`],
+    ['human', `Human ratings (${human.ratings.length})`],
     ['evidence', 'What the judge sees'],
     ['states', 'All captured states'],
     ['code', 'Code'],
@@ -620,7 +640,7 @@ async function renderCase(caseId, tab, version) {
   }
   if (tab === 'states') body.append(renderAllStates(data, await api(`checkmarks/${caseId}/${bundle.bundleId}`)));
   if (tab === 'code') body.append(renderCode(caseId, data.codeFiles));
-  if (tab === 'human') body.append(humanRatingsTab(caseId, await api(`human/${caseId}`), summary.latest?.interfaceId));
+  if (tab === 'human') body.append(humanRatingsTab(caseId, human, summary.latest?.interfaceId));
 }
 
 function renderAllStates({ bundle, diagnostics }, checkmarks = {}) {
@@ -1670,7 +1690,9 @@ function humanRatingsTab(caseId, data, interfaceId) {
           ]
         : null,
     ),
-    data.ratings.length
+    data.error
+      ? h('div', { class: 'notice' }, `Could not load ratings: ${data.error}`)
+      : data.ratings.length
       ? h(
           'div',
           { class: 'panel' },
@@ -1802,7 +1824,7 @@ async function renderHumanRating(caseId, ratingId) {
     h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'row' }, h('h1', {}, `${r.rater}’s rating`), h('span', { class: 'spacer' }), h('button', { type: 'button', class: 'link-btn', onclick: del }, 'Delete rating')),
+      h('div', { class: 'row' }, h('h1', {}, `${r.rater}’s rating`), h('span', { class: 'spacer' }), HOSTED ? null : h('button', { type: 'button', class: 'link-btn', onclick: del }, 'Delete rating')),
       h('p', { class: 'meta' }, `${fmtDate(r.createdAt)} · prompt ${r.promptVersion} · evidence ${r.bundleId}${r.durationMs ? ` · ${Math.round(r.durationMs / 60000)} min` : ''}`),
       h(
         'p',

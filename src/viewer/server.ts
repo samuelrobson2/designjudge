@@ -13,6 +13,7 @@ import { LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
 import { parseLayoutRubric } from '../categories/layout/rubric.ts';
 import { bundleDir, listBundles, listRuns, loadBundle, loadDiagnostics, runDir } from '../store.ts';
 import { deleteRating, HUMAN_DIR, listRatings, loadRating, saveRating } from '../human/store.ts';
+import { ratingListItem } from '../human/rating.ts';
 import { log, readJson } from '../util.ts';
 
 const PUBLIC_DIR = path.join(ROOT, 'src/viewer/public');
@@ -187,16 +188,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         }
         return json(res, {
           latestBundleId: listBundles(a).length ? loadBundle(a).bundleId : null,
-          ratings: listRatings(a).map((r) => ({
-            ratingId: r.ratingId,
-            rater: r.rater,
-            createdAt: r.createdAt,
-            bundleId: r.bundleId,
-            promptVersion: r.promptVersion,
-            durationMs: r.durationMs,
-            score: r.output.overall.score,
-            anchor: r.output.overall.anchor,
-          })),
+          ratings: listRatings(a).map(ratingListItem),
           judge: judgeScores(a),
         });
       }
@@ -294,6 +286,6 @@ export async function startViewer(port: number): Promise<http.Server> {
     handle(req, res).catch((err) => json(res, { error: String(err) }, 500));
   });
   await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
-  log(`Viewer running at http://127.0.0.1:${port}`);
+  if (port) log(`Viewer running at http://127.0.0.1:${port}`);
   return server;
 }

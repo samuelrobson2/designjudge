@@ -2,5 +2,7 @@ node_modules/
 artifacts/
 mutations/_previews/
 .env
+.env*.local
+.vercel/
 .DS_Store
 .Rhistory
