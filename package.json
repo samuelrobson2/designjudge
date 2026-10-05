@@ -15,6 +15,7 @@
     "view": "node --import tsx src/cli.ts view",
     "publish": "node --import tsx src/cli.ts publish",
     "human-csvs": "node --import tsx src/cli.ts human-csvs",
+    "calibration-data": "node --import tsx src/cli.ts calibration-data",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

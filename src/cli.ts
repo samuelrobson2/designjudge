@@ -32,6 +32,7 @@ Usage:
   npm run view     -- [--port 4600]           Open the web viewer
   npm run publish  -- [--build-only]          Build the hosted rating site from the latest evidence and deploy it to Vercel
   npm run human-csvs                          Rewrite benchmark/human/*.csv from the rating files (e.g. after git pull brings in hosted ratings)
+  npm run calibration-data                    Download UICrit designer critiques and their Rico screenshots into artifacts/calibration
 `;
 
 async function resolveCases(ids: string[]): Promise<string[]> {
@@ -135,6 +136,11 @@ async function main() {
       const { HUMAN_DIR, listRatings, writeHumanCsvs } = await import('./human/store.ts');
       writeHumanCsvs();
       log(`ratings.csv, findings.csv and points.csv written to ${path.relative(process.cwd(), HUMAN_DIR)} (${listRatings().length} ratings)`);
+      break;
+    }
+    case 'calibration-data': {
+      const { buildCalibrationDataset } = await import('./calibration/uicrit.ts');
+      await buildCalibrationDataset();
       break;
     }
     default:

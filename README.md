@@ -144,6 +144,30 @@ When you publish new evidence for an interface, earlier ratings keep the `bundle
 3. Run `npm run collect -- <your case id>`, then `npm run judge -- <your case id>`.
 4. Run `npm run publish` if people should be able to rate it.
 
+## Designer critiques from UICrit
+
+To check the judge against professional designers, we collect written critiques from [UICrit](https://github.com/google-research-datasets/uicrit) ([paper](https://arxiv.org/abs/2407.08850)): about three designers each critiqued 1,000 screenshots of real Android apps from [Rico](https://www.interactionmining.org/archive/rico), for example "In the current design, text (Plans) is in light red color on white background which is not making a good contrast. To fix this, change texts to dark colors."
+
+Build it with:
+
+```bash
+npm run calibration-data
+```
+
+This downloads the critiques and streams the 6 GB Rico archive, keeping only the 1,000 screenshots UICrit uses. It writes `artifacts/calibration/`:
+
+- `critiques.csv` has one row per screen:
+  - `prompt` is the screen's main task, as each designer described it (one description per line).
+  - `image` is the screenshot's path, relative to the folder, and `image_size` its width × height in pixels (1080×1920 or 540×960), to tell the judge.
+  - The rating columns are the designers' mean scores, to one decimal place: design quality, aesthetics and usability out of 10, and learnability and efficiency out of 5.
+  - `feedback` lists every comment the designers wrote, one per line.
+- `images/` holds the screenshots, named by Rico screen ID.
+- `source.json` has the paper, licence and citation for both datasets.
+
+Only comments the designers wrote themselves are kept. UICrit also has Gemini-written comments that a designer marked as valid; those are left out, as are the comments' bounding boxes.
+
+The critiques are licensed CC BY 4.0, so anything published with them must cite the paper. The screenshots are not: under [Rico's terms](https://www.interactionmining.org/legal/copyright) they may contain copyrighted work, whoever downloads them takes responsibility for their use and indemnifies the Rico team and the University of Illinois, and an employer is bound too. Keep them in `artifacts/`, which is gitignored, and never put them in `cases/` or on the rating site.
+
 ## Tests
 
 ```bash
