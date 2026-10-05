@@ -89,7 +89,7 @@ Every rating is saved as its own JSON file in this repo, at:
 benchmark/human/<interface>/<date-time>-<name>.json
 ```
 
-Ratings from the website are committed straight to `main`, one commit per rating, with a message like "Add human rating booking-baseline/...". Each file has the score, the notes for each evaluation point, any call-outs, the rater's name, how long they took, and which evidence and prompt version they rated.
+Ratings from the website are committed straight to `main`, one commit per rating, with a message like "Add human rating booking-baseline/...". Each file has the score, the note for each criterion, the rater's name, how long they took, and which evidence and prompt version they rated.
 
 Nothing is stored anywhere else. The JSON files in the repo are the full record.
 
@@ -102,9 +102,8 @@ npm run human-csvs
 
 `git pull` brings down any new rating files. `npm run human-csvs` then rebuilds three CSVs in `benchmark/human/` from all the rating files:
 
-- `ratings.csv` has one row per rating: score, overall reasoning, the note for each criterion (`criterion_A_summary` and so on), the number of strengths and weaknesses, the time taken, and `view`.
-- `findings.csv` has one row per call-out a rater made: the criterion, the evaluation point, strength or weakness, how serious it is, and what they saw.
-- `points.csv` has one row per evaluation point a rater wrote a separate note on. The current form takes one note per criterion instead, so this file only has rows from older ratings.
+- `ratings.csv` has one row per rating: score, overall reasoning, the note for each criterion (`criterion_A_summary` and so on), the time taken, and `view`.
+- `findings.csv` and `points.csv` only have rows from ratings made with older versions of the form, which had specific call-outs and a note per evaluation point. The current form doesn't have either.
 
 The columns match the judge's CSVs, so you can join them on `case_id` (and `bundle_id` if you want to make sure both rated the same evidence).
 

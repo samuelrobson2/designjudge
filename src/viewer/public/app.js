@@ -1103,8 +1103,7 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
 // use the live interface (at each screen size and content state) and see screenshots only where
 // automated checks failed. Their answers fill the judge's output schema, so a human rating has
 // the judge's shape: each criterion's note is its summary, and the evaluation points are prompts
-// rather than separate fields. Notes and call-outs (findings) are optional; only the score is
-// required.
+// rather than separate fields. Raters don't add findings; only the score is required.
 
 const RATER_KEY = 'dj-rater';
 const draftKey = (caseId, bundleId, v) => `dj-rate:${caseId}:${bundleId}:${v}`;
@@ -1129,21 +1128,16 @@ function mergeDraft(node, value) {
   return value === undefined ? emptyFromSchema(node) : value;
 }
 
-function allFindingIds(draft) {
-  return Object.values(draft.criteria ?? {}).flatMap((c) => (c.findings ?? []).map((f) => f.id));
-}
-
 // What the draft still needs, with the step to fix it on. The server validates again on submit.
 function draftProblems(draft) {
-  const out = [];
-  for (const [cid, c] of Object.entries(draft.criteria ?? {})) {
-    for (const f of c.findings ?? []) {
-      const missing = [!f.evaluation_point && 'the evaluation point', !f.polarity && 'the type', !f.materiality && 'material or minor', !f.observation?.trim() && 'what you saw'].filter(Boolean);
-      if (missing.length) out.push({ step: cid, text: `Call-out ${f.id}: add ${joinAnd(missing)}.` });
-    }
-  }
-  if (draft.overall?.score === null) out.push({ step: 'final', text: 'Choose a score.' });
-  return out;
+  return draft.overall?.score === null ? [{ step: 'final', text: 'Choose a score.' }] : [];
+}
+
+// Drafts started when the form had call-outs may hold unfinished ones, which no longer have
+// fields to finish them in.
+function withoutUnfinishedCallouts(draft) {
+  const done = (f) => f.evaluation_point && f.polarity && f.materiality && f.observation?.trim();
+  return { ...draft, criteria: Object.fromEntries(Object.entries(draft.criteria).map(([cid, c]) => [cid, { ...c, findings: c.findings.filter(done) }])) };
 }
 
 // The scoring section of the judge's instructions for this prompt version, split into its
@@ -1429,7 +1423,6 @@ function failureShots(input, cid) {
 // Form controls bound to the draft. `changed(structural)` saves; structural changes redraw the form.
 function formKit(input, draft, changed) {
   const stateIds = [...new Set([...Object.values(input.evidenceIndex ?? {}).map((e) => e.stateId).filter(Boolean), 'desktop', 'tablet', 'mobile', 'stress-desktop'])].sort();
-  const ids = Object.keys(input.evidenceIndex ?? {});
   const help = (text) => (text ? h('p', { class: 'help' }, text) : null);
   const field = (label, helpText, control) => h('div', { class: 'field' }, label ? h('div', { class: 'field__label' }, label) : null, help(helpText), control);
   const textArea = (obj, key, rows = 3, placeholder = '') => h('textarea', { rows, placeholder, oninput: (e) => ((obj[key] = e.target.value), changed(false)) }, obj[key] ?? '');
@@ -1445,29 +1438,6 @@ function formKit(input, draft, changed) {
       { class: 'checks' },
       options.map(([value, text]) =>
         h('label', {}, h('input', { type: 'checkbox', checked: arr.includes(value), onchange: (e) => (e.target.checked ? arr.push(value) : arr.splice(arr.indexOf(value), 1), changed(false)) }), ' ', text),
-      ),
-    );
-  const REF_GROUPS = [
-    ['Screenshots', 'S-'],
-    ['Failed-check issues', 'F-'],
-    ['Checks', 'C-'],
-    ['Measurements', 'O-'],
-  ];
-  const refPicker = (arr) =>
-    h(
-      'div',
-      { class: 'refs' },
-      arr.length
-        ? h('div', { class: 'chips' }, arr.map((r, i) => h('span', { class: 'chip chip--static' }, r, h('button', { type: 'button', class: 'chip__x', 'aria-label': `Remove ${r}`, onclick: () => (arr.splice(i, 1), changed(true)) }, '×'))))
-        : null,
-      h(
-        'select',
-        { onchange: (e) => (e.target.value && !arr.includes(e.target.value) ? (arr.push(e.target.value), changed(true)) : null) },
-        h('option', { value: '' }, 'Add an evidence ID…'),
-        REF_GROUPS.map(([name, prefix]) => {
-          const list = ids.filter((id) => id.startsWith(prefix) && !arr.includes(id));
-          return list.length ? h('optgroup', { label: name }, list.map((id) => h('option', { value: id }, id))) : null;
-        }),
       ),
     );
   const stringList = (arr) =>
@@ -1498,47 +1468,19 @@ function formKit(input, draft, changed) {
       );
     return textArea(obj, key);
   };
-  return { stateIds, field, textArea, voiceText, seg, checkList, refPicker, control };
+  return { stateIds, field, textArea, voiceText, seg, checkList, control };
 }
 
 function criterionForm(kit, input, draft, cid, changed) {
-  const { field } = kit;
   const criterion = META.criteria.find((c) => c.id === cid);
   const c = draft.criteria[cid];
-  const itemProps = input.schema.properties.criteria.properties[cid].properties.findings.items.properties;
-  const addCallout = () => {
-    const used = allFindingIds(draft).filter((id) => id.startsWith(cid)).map((id) => Number(id.slice(cid.length)) || 0);
-    c.findings.push({ ...emptyFromSchema(input.schema.properties.criteria.properties[cid].properties.findings.items), id: `${cid}${Math.max(0, ...used) + 1}` });
-    changed(true);
-  };
-  const callout = (f, i) =>
-    h(
-      'div',
-      { class: `form-card ${f.polarity ?? ''}` },
-      h('div', { class: 'row' }, h('strong', { class: 'mono' }, f.id), h('span', { class: 'spacer' }), h('button', { type: 'button', class: 'link-btn', onclick: () => (c.findings.splice(i, 1), changed(true)) }, 'Remove')),
-      field('Evaluation point', null, h('select', { onchange: (e) => ((f.evaluation_point = e.target.value || null), changed(false)) }, h('option', { value: '' }, 'Choose…'), criterion.points.map((p) => h('option', { value: p.key, selected: f.evaluation_point === p.key }, p.name)))),
-      field('Type', null, kit.seg(f, 'polarity', [['strength', 'Strength'], ['weakness', 'Weakness'], ['missed_opportunity', 'Missed opportunity']])),
-      field('Material or minor', itemProps.materiality.description ? `It is ${itemProps.materiality.description}` : null, kit.seg(f, 'materiality', [['material', 'Material'], ['minor', 'Minor']])),
-      field('What you saw', null, kit.textArea(f, 'observation', 2)),
-      field('Why it matters', 'Optional.', kit.textArea(f, 'why_it_matters', 2)),
-      field('Evidence', 'Optional. Screenshot, issue or measurement IDs that show it.', kit.refPicker(f.evidence_refs)),
-      field('States', 'Optional. The states it applies to.', kit.checkList(f.states, kit.stateIds.map((s) => [s, s]))),
-    );
   return [
     h(
       'div',
       { class: 'form-section' },
-      h('h3', {}, 'Your notes', h('span', { class: 'faint small' }, ' · optional')),
-      h('p', { class: 'help' }, 'Type, or click Speak and talk through what you see. Some things to think about:'),
+      h('h3', {}, 'Your notes'),
       h('ul', { class: 'prompts' }, criterion.points.map((p) => h('li', { title: `${p.name}: ${p.definition}` }, POINT_PROMPTS[p.key] ?? `${p.name}: ${p.definition}`))),
       kit.voiceText(c, 'summary', 9, 'What works, what doesn’t, and where you saw it.'),
-    ),
-    h(
-      'div',
-      { class: 'form-section' },
-      h('h3', {}, 'Specific call-outs', h('span', { class: 'faint small' }, ' · optional')),
-      h('p', { class: 'help' }, 'Flag a specific strength or problem: what you saw, which point it relates to, and whether it’s material or minor.'),
-      h('div', { class: 'stack' }, c.findings.map(callout), h('button', { type: 'button', class: 'btn-secondary', onclick: addCallout }, `+ Add a call-out for ${cid}`)),
     ),
   ];
 }
@@ -1688,8 +1630,7 @@ async function renderRate(interfaceId, version) {
           { class: 'steps-list' },
           h('li', {}, 'Read the prompt above. You are rating how well the layout serves it.'),
           h('li', {}, `Go through the criteria on the next pages (${cids[0]} to ${cids.at(-1)}), one at a time.`),
-          h('li', {}, 'On each page, try the interface and write down, or say, what you notice. The questions above the notes box give you ideas. Notes are optional.'),
-          h('li', {}, 'If something specific stands out, add a call-out.'),
+          h('li', {}, 'On each page, try the interface and write down, or say, what you notice. The questions above the notes box give you ideas.'),
           h('li', {}, 'On the last page, pick a score from 1 to 5 and say why.'),
         ),
         h('p', { class: 'field__label', style: { marginTop: '16px' } }, 'Good to know'),
@@ -1778,7 +1719,7 @@ async function renderRate(interfaceId, version) {
             ),
           ),
         ),
-        h('div', { class: 'form-section' }, kit.field('Why this score', 'Which of your notes or call-outs led to it.', kit.voiceText(overall, 'reasoning', 5))),
+        h('div', { class: 'form-section' }, kit.field('Why this score', 'Which of your notes led to it.', kit.voiceText(overall, 'reasoning', 5))),
         h(
           'details',
           { class: 'form-section' },
@@ -1800,7 +1741,7 @@ async function renderRate(interfaceId, version) {
       const res = await fetch(`/api/human/${caseId}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bundleId, promptVersion: v, rater, output: state.draft, startedAt: state.startedAt, view: 'live' }),
+        body: JSON.stringify({ bundleId, promptVersion: v, rater, output: withoutUnfinishedCallouts(state.draft), startedAt: state.startedAt, view: 'live' }),
       });
       const data = await res.json();
       if (!res.ok) return status.replaceChildren(h('div', { class: 'issue-list' }, (data.errors ?? [data.error]).map((p) => h('p', { class: 'issue' }, p))));

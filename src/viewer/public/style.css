@@ -345,10 +345,6 @@ details.disclosure pre { margin-top: 10px; padding: 16px; background: #f7f7f8; b
 .seg button { cursor: pointer; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-size: 13px; }
 .seg button.active { background: var(--text); color: #fff; border-color: var(--text); }
 .checks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
-.refs { display: flex; flex-direction: column; gap: 6px; }
-.chip--static { cursor: default; display: inline-flex; align-items: center; gap: 4px; }
-.chip__x { all: unset; cursor: pointer; color: var(--muted); padding: 0 2px; }
-.chip__x:hover { color: var(--fail); }
 .btn-primary { display: inline-block; cursor: pointer; padding: 8px 14px; border: 0; border-radius: 7px; background: var(--text); color: #fff; font-weight: 600; font-size: 14px; }
 .btn-primary:hover { text-decoration: none; opacity: 0.9; }
 .btn-secondary { cursor: pointer; align-self: flex-start; padding: 5px 10px; border: 1px dashed var(--line-strong); border-radius: 6px; background: transparent; font-size: 13px; color: var(--muted); }
