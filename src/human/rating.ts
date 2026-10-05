@@ -21,9 +21,14 @@ export interface HumanRating {
   createdAt: string;
   // Time from opening the form to submitting it.
   durationMs: number | null;
+  // What the person looked at: the judge's screenshots, or the live interface plus the
+  // screenshots of failed checks. Ratings saved before this field existed used screenshots.
+  view?: RatingView;
   output: LayoutJudgment;
   validation: Validation;
 }
+
+export type RatingView = 'screenshots' | 'live';
 
 export interface RatingInput {
   bundleId: string;
@@ -31,6 +36,7 @@ export interface RatingInput {
   rater: string;
   output: unknown;
   startedAt?: string | null;
+  view?: string;
 }
 
 export interface RatingContext {
@@ -70,6 +76,7 @@ export function makeRating(ctx: RatingContext, input: RatingInput): { rating?: H
       rater,
       createdAt: createdAt.toISOString(),
       durationMs: Number.isFinite(started) ? Math.max(0, createdAt.getTime() - started) : null,
+      view: input.view === 'live' ? 'live' : 'screenshots',
       output,
       validation,
     },
@@ -84,6 +91,7 @@ export const ratingListItem = (r: HumanRating) => ({
   bundleId: r.bundleId,
   promptVersion: r.promptVersion,
   durationMs: r.durationMs,
+  view: r.view ?? 'screenshots',
   score: r.output.overall.score,
   anchor: r.output.overall.anchor,
 });
@@ -96,7 +104,7 @@ export function humanCsvs(ratings: HumanRating[]): Record<'ratings.csv' | 'findi
     LAYOUT_CRITERIA.flatMap((c) => (r.output.criteria[c.id]?.findings ?? []).map((f) => ({ ...f, criterion: c.id })));
   const ratingRows = [
     [
-      'rating_id', 'case_id', 'bundle_id', 'interface_id', 'prompt_version', 'packet_hash', 'rater', 'created_at', 'duration_min',
+      'rating_id', 'case_id', 'bundle_id', 'interface_id', 'prompt_version', 'packet_hash', 'view', 'rater', 'created_at', 'duration_min',
       'score', 'anchor', 'strengths', 'weaknesses', 'material_weaknesses', 'reasoning',
       ...LAYOUT_CRITERIA.map((c) => `criterion_${c.id}_summary`), 'missing_evidence', 'untrusted_content_notes', 'refs', 'valid_refs', 'ref_errors',
     ],
@@ -104,7 +112,7 @@ export function humanCsvs(ratings: HumanRating[]): Record<'ratings.csv' | 'findi
       const fs_ = findings(r);
       const weak = fs_.filter((f) => f.polarity !== 'strength');
       return [
-        r.ratingId, r.caseId, r.bundleId, r.interfaceId, r.promptVersion, r.packetHash, r.rater, r.createdAt,
+        r.ratingId, r.caseId, r.bundleId, r.interfaceId, r.promptVersion, r.packetHash, r.view ?? 'screenshots', r.rater, r.createdAt,
         r.durationMs === null ? null : Math.round(r.durationMs / 6000) / 10,
         r.output.overall.score, r.output.overall.anchor, fs_.length - weak.length, weak.length, weak.filter((f) => f.materiality === 'material').length, r.output.overall.reasoning,
         ...LAYOUT_CRITERIA.map((c) => r.output.criteria[c.id]?.summary ?? ''),
@@ -120,13 +128,16 @@ export function humanCsvs(ratings: HumanRating[]): Record<'ratings.csv' | 'findi
       findings(r).map((f) => [r.ratingId, r.caseId, r.rater, f.criterion, f.id, f.evaluation_point, f.polarity, f.materiality, f.evidence_refs.join(' '), f.states.join(' '), f.observation, f.why_it_matters]),
     ),
   ];
+  // Only points the person said something about: the rating form takes one note per criterion,
+  // so most points are left untouched.
   const pointRows = [
     ['rating_id', 'case_id', 'rater', 'criterion', 'evaluation_point', 'point_name', 'applicable', 'assessment'],
     ...ratings.flatMap((r) =>
       LAYOUT_CRITERIA.flatMap((c) =>
-        c.points.map((p) => {
+        c.points.flatMap((p) => {
           const e = r.output.criteria[c.id]?.evaluation_points[p.key];
-          return [r.ratingId, r.caseId, r.rater, c.id, p.key, p.name, e ? (e.applicable ? 'yes' : 'no') : '', e?.assessment ?? ''];
+          if (!e || (e.applicable && !e.assessment.trim())) return [];
+          return [[r.ratingId, r.caseId, r.rater, c.id, p.key, p.name, e.applicable ? 'yes' : 'no', e.assessment]];
         }),
       ),
     ),

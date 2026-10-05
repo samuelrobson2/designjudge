@@ -261,6 +261,9 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       }
       const file = resolveInside(root, rest === '/' ? '/index.html' : rest);
       if (!file) return json(res, { error: 'Forbidden' }, 403);
+      // The rating page shows the interface in a sandboxed frame (an opaque origin), which can
+      // only load its module scripts with CORS.
+      res.setHeader('access-control-allow-origin', '*');
       return sendFile(res, file);
     }
     if (parts[0] === 'code' && parts[1]) {

@@ -54,6 +54,27 @@ describe.skipIf(!caseId)('Human ratings', () => {
     expect(res.rating!.validation.refIssues.filter((i) => i.severity === 'error')).toEqual([]);
   });
 
+  it('records the live view, with one note per criterion and no per-point rows', async () => {
+    const { makeRating, humanCsvs } = await import('../src/human/rating.ts');
+    const { loadOrBuildPacket } = await import('../src/categories/index.ts');
+    const { loadBundle } = await import('../src/store.ts');
+    const { layoutOutputJsonSchema } = await import('../src/categories/layout/schema.ts');
+    const bundle = loadBundle(caseId!);
+    const empty = (node: any): unknown =>
+      node.type === 'object' ? Object.fromEntries(Object.entries(node.properties).map(([k, v]) => [k, empty(v)])) : node.type === 'array' ? [] : node.type === 'boolean' ? true : node.enum ? node.enum[0] : '';
+    const output = empty(layoutOutputJsonSchema(undefined, { decisive: false })) as any;
+    output.criteria.A.summary = 'The booking button is easy to find on desktop but drops below the fold on phones.';
+    const ctx = { caseId: caseId!, bundleId: bundle.bundleId, interfaceId: bundle.interfaceId, promptVersion: 'v6', promptHash: 'p', packetHash: 'k', packet: loadOrBuildPacket(bundle, 'v6') };
+    const live = makeRating(ctx, { bundleId: bundle.bundleId, promptVersion: 'v6', rater: 'Ada', output, view: 'live' }).rating!;
+    const unknown = makeRating(ctx, { bundleId: bundle.bundleId, promptVersion: 'v6', rater: 'Ada', output, view: 'anything' }).rating!;
+    expect(live.view).toBe('live');
+    expect(unknown.view).toBe('screenshots');
+    const csvs = humanCsvs([live]);
+    expect(csvs['ratings.csv']).toContain(',live,');
+    expect(csvs['ratings.csv']).toContain('drops below the fold on phones');
+    expect(csvs['points.csv'].trim().split('\n')).toHaveLength(1);
+  });
+
   it('rejects output that does not match the schema, and a missing rater', async () => {
     const { saveRating } = await import('../src/human/store.ts');
     const { loadBundle } = await import('../src/store.ts');

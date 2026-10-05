@@ -29,8 +29,10 @@ export function loadRun(runId: string): { run: RunRecord; judgments: JudgmentRec
   const judgments: JudgmentRecord[] = [];
   const jdir = path.join(dir, 'judgments');
   if (fs.existsSync(jdir)) {
-    for (const caseId of fs.readdirSync(jdir).sort()) {
-      for (const f of fs.readdirSync(path.join(jdir, caseId)).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)))) {
+    const caseIds = fs.readdirSync(jdir).filter((d) => fs.statSync(path.join(jdir, d)).isDirectory());
+    for (const caseId of caseIds.sort()) {
+      const files = fs.readdirSync(path.join(jdir, caseId)).filter((f) => f.endsWith('.json'));
+      for (const f of files.sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)))) {
         judgments.push(readJson<JudgmentRecord>(path.join(jdir, caseId, f)));
       }
     }

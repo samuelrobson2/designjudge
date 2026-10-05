@@ -131,7 +131,7 @@ export async function buildHostedSite(): Promise<void> {
       }
     }
 
-    for (const name of fs.readdirSync(PUBLIC_DIR)) copyInto(path.join(PUBLIC_DIR, name), path.join(STATIC, name));
+    for (const name of fs.readdirSync(PUBLIC_DIR).filter((f) => !f.startsWith('.'))) copyInto(path.join(PUBLIC_DIR, name), path.join(STATIC, name));
     const indexFile = path.join(STATIC, 'index.html');
     fs.writeFileSync(indexFile, fs.readFileSync(indexFile, 'utf8').replace('<script type="module"', '<script>window.DJ_HOSTED = true;</script>\n    <script type="module"'));
 
@@ -156,6 +156,7 @@ export async function buildHostedSite(): Promise<void> {
         { src: '^/api/human/(.+)$', dest: '/api/human?path=$1' },
         { src: '^/files/human/(ratings|findings|points)\\.csv$', dest: '/api/human?csv=$1' },
         { src: '^/data/(.*)$', headers: { 'cache-control': 'public, max-age=0, must-revalidate' }, continue: true },
+        { src: '^/site/(.*)$', headers: { 'access-control-allow-origin': '*' }, continue: true },
         { handle: 'filesystem' },
         { src: '^/site/([^/]+)/?$', dest: '/site/$1/index.html' },
         { src: '^/api/(.*)$', status: 404, dest: '/404.json' },

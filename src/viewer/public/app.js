@@ -1050,7 +1050,7 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
           'div',
           { class: 'criterion' },
           h('h2', {}, `${c.id} · ${c.name}`),
-          h('p', { class: 'criterion__summary' }, cr.summary),
+          cr.summary.trim() ? h('p', { class: 'criterion__summary' }, cr.summary) : h('p', { class: 'muted' }, 'No notes.'),
           cr.findings.map((f) => {
             const bad = new Set(issues.filter((i) => i.findingId === f.id && i.severity === 'error').map((i) => i.ref));
             return h(
@@ -1071,7 +1071,10 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
               h('div', { class: 'chips' }, f.evidence_refs.map((r) => chipFor(r, bad.has(r)))),
             );
           }),
-          h(
+          // People rating with one note per criterion leave every point untouched.
+          !c.points.some((p) => cr.evaluation_points[p.key]?.assessment?.trim() || cr.evaluation_points[p.key]?.applicable === false)
+            ? null
+            : h(
             'details',
             { class: 'disclosure' },
             h('summary', {}, `Evaluation points (${c.points.length})`),
@@ -1097,9 +1100,11 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
 
 // ---------- Human ratings ----------
 // A person rates in steps: instructions, one page per criterion, then the final judgement. They
-// see the judge's screenshots and evidence, and their answers fill the judge's output schema, so
-// a human rating has exactly the judge's shape. Notes, summaries and call-outs (findings) are
-// optional; only the score is required.
+// use the live interface (at each screen size and content state) and see screenshots only where
+// automated checks failed. Their answers fill the judge's output schema, so a human rating has
+// the judge's shape: each criterion's note is its summary, and the evaluation points are prompts
+// rather than separate fields. Notes and call-outs (findings) are optional; only the score is
+// required.
 
 const RATER_KEY = 'dj-rater';
 const draftKey = (caseId, bundleId, v) => `dj-rate:${caseId}:${bundleId}:${v}`;
@@ -1169,11 +1174,11 @@ function openShot(img) {
   openModal(h('div', {}, h('p', { class: 'small muted', style: { marginBottom: '10px' } }, h('code', {}, img.id), ` — ${img.caption}`), h('img', { src: imgSrc(img.path), style: { maxWidth: `${displayWidth(img)}px` } })));
 }
 
-function shotGallery(images, open) {
+function shotGallery(images, open, title = 'Screenshots') {
   return h(
     'details',
     { class: 'gallery-wrap', open },
-    h('summary', {}, h('h2', {}, 'Screenshots'), h('span', { class: 'count' }, images.length), h('span', { class: 'small muted' }, 'Click one to see it full size.')),
+    h('summary', {}, h('h2', {}, title), h('span', { class: 'count' }, images.length), h('span', { class: 'small muted' }, 'Click one to see it full size.')),
     h(
       'div',
       { class: 'gallery' },
@@ -1227,10 +1232,10 @@ function criterionEvidence(ev, images) {
         : h('p', { class: 'muted' }, 'None failed for this criterion.'),
     ),
     h(
-      'div',
-      { class: 'panel panel--pad ev-group' },
-      h('h3', {}, 'Measurements outside or near the rubric reference'),
-      h('p', { class: 'help' }, 'Values to weigh in context; they are not failures.'),
+      'details',
+      { class: 'panel panel--pad ev-group disclosure' },
+      h('summary', {}, `Measurements to weigh (${ev.observations.reduce((n, b) => n + b.lines.length, 0)})`),
+      h('p', { class: 'help' }, 'Values outside or near the rubric’s reference. They are not failures; weigh them in context.'),
       ev.observations.length
         ? ev.observations.map((b) =>
             h(
@@ -1246,6 +1251,181 @@ function criterionEvidence(ev, images) {
   ];
 }
 
+// Each evaluation point as a question for the rater. Points not listed fall back to the rubric's
+// definition.
+const POINT_PROMPTS = {
+  primary_focus: 'Is the main task, and the main action, obvious straight away?',
+  task_aligned_order: 'Does content come in order of importance, with the main task first?',
+  grouping: 'Are related things grouped together, and separate groups clearly apart?',
+  alignment: 'Do things line up on shared edges, with consistent spacing?',
+  structural_restraint: 'Does it rely on spacing and alignment, rather than extra boxes, cards and dividers?',
+  focused_composition: 'Is everything on the page needed for the task?',
+  appropriate_density: 'Is the amount of information right for the task: not too sparse, not too crowded?',
+  efficient_use_of_space: 'Is space used well, without oversized areas, repetition or needless scrolling?',
+  clutter_control: 'Is secondary information tucked away or simplified where it would get in the way?',
+  content_fit: 'Do labels, values, tables and lists have room to stay readable? Try “Longer text” and “Lots of content”.',
+  usable_sizing: 'Does each main area and component get enough space to do its job?',
+  functional_proportion: 'Do widths, heights and shapes suit what each component holds?',
+  compositional_balance: 'Do the main and supporting areas feel balanced, with nothing accidentally huge, tiny or empty?',
+  peer_consistency: 'Are similar components the same size and shape?',
+  structural_integrity: 'Does anything overlap, get cut off, collapse or crowd the edges?',
+  adaptive_behavior: 'On a smaller screen, do things stack, resize or simplify sensibly? Try Tablet and Phone.',
+  growth_resilience: 'Does the layout hold up with lots of data or longer text?',
+  priority_preservation: 'Do the important things stay prominent on smaller screens and with more content?',
+  reachability: 'Can you still reach the key content and actions on a phone, or when the page is full?',
+  scroll_behavior: 'Is any extra scrolling or hiding on small screens deliberate and easy to find?',
+};
+
+// Dictation into a text box, using the browser's speech recognition. Only one runs at a time.
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let activeVoice = null;
+const MIC =
+  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>';
+
+function voiceButton(textarea, onText) {
+  if (!SpeechRec) return h('span', { class: 'small faint' }, 'Voice input isn’t available in this browser. Try Chrome, Edge or Safari.');
+  const label = h('span', {}, 'Speak');
+  const interim = h('span', { class: 'voice__interim' });
+  const note = h('span', { class: 'small faint' });
+  const btn = h('button', { type: 'button', class: 'voice-btn', 'aria-pressed': 'false', title: 'Talk instead of typing. Your browser turns speech into text; nothing is recorded.', onclick: () => (on ? stop() : start()) }, icon(MIC), label);
+  let rec = null;
+  let on = false;
+  const ui = () => {
+    btn.classList.toggle('voice-btn--on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    label.textContent = on ? 'Listening… click to stop' : 'Speak';
+    if (!on) interim.textContent = '';
+  };
+  const append = (text) => {
+    const t = text.trim();
+    if (!t) return;
+    const cur = textarea.value;
+    const newSentence = !cur.trim() || /[.!?]\s*$/.test(cur);
+    textarea.value = cur + (cur && !/\s$/.test(cur) ? ' ' : '') + (newSentence ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+    onText(textarea.value);
+  };
+  const stop = () => {
+    on = false;
+    rec?.stop();
+    rec = null;
+    if (activeVoice?.stop === stop) activeVoice = null;
+    ui();
+  };
+  const start = () => {
+    activeVoice?.stop();
+    activeVoice = { stop };
+    note.textContent = '';
+    rec = new SpeechRec();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = navigator.language || 'en-GB';
+    rec.onresult = (e) => {
+      let pending = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) append(e.results[i][0].transcript);
+        else pending += e.results[i][0].transcript;
+      }
+      interim.textContent = pending;
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') note.textContent = 'Microphone access is blocked. Allow it in your browser’s address bar, then try again.';
+      if (e.error !== 'no-speech' && e.error !== 'aborted') stop();
+    };
+    // Browsers end recognition after a pause; carry on until the person stops it.
+    rec.onend = () => {
+      if (!on || !rec) return;
+      try {
+        rec.start();
+      } catch {
+        stop();
+      }
+    };
+    rec.start();
+    on = true;
+    ui();
+  };
+  return h('div', { class: 'voice' }, btn, interim, note);
+}
+
+// The interface itself, in a sandboxed frame at a chosen screen size and content state. Built
+// once per rating so it keeps its state while the person moves between steps.
+const VIEW_SIZES = [
+  { label: 'Desktop', width: 1440, height: 900 },
+  { label: 'Tablet', width: 768, height: 1024 },
+  { label: 'Phone', width: 360, height: 800 },
+];
+const FIXTURE_LABELS = { typical: 'Typical content', empty: 'Empty', dense: 'Lots of content', expanded: 'Longer text', stress: 'Stress test' };
+
+function liveViewer(caseId, fixtures) {
+  const state = { size: VIEW_SIZES[0], fixture: 'typical', full: false };
+  const src = () => `/site/${caseId}/${state.fixture === 'typical' ? '' : `?fixture=${state.fixture}`}`;
+  const frame = h('iframe', { class: 'live__frame', title: 'The interface being rated', sandbox: 'allow-scripts allow-forms allow-popups allow-modals', src: src() });
+  const scaler = h('div', { class: 'live__scaler' }, frame);
+  const stage = h('div', { class: 'live__stage' }, scaler);
+  const sizeNote = h('span', { class: 'small muted' });
+  const fit = () => {
+    const avail = stage.clientWidth;
+    if (!avail) return;
+    const { width: w, height: ht } = state.size;
+    const scale = Math.min(1, avail / w, state.full ? (window.innerHeight - 110) / ht : 1);
+    Object.assign(frame.style, { width: `${w}px`, height: `${ht}px`, transform: `scale(${scale})` });
+    Object.assign(scaler.style, { width: `${Math.floor(w * scale)}px`, height: `${Math.floor(ht * scale)}px` });
+    sizeNote.textContent = `${w} × ${ht}${scale < 0.995 ? ` · shown at ${Math.round(scale * 100)}%` : ''}`;
+  };
+  const sizeButtons = VIEW_SIZES.map((s) => h('button', { type: 'button', onclick: () => ((state.size = s), draw()) }, s.label));
+  const draw = () => {
+    sizeButtons.forEach((b, i) => b.classList.toggle('active', VIEW_SIZES[i] === state.size));
+    fit();
+  };
+  const contentPicker = fixtures.length
+    ? h(
+        'label',
+        { class: 'small live__content' },
+        'Content ',
+        h('select', { onchange: (e) => ((state.fixture = e.target.value), (frame.src = src())) }, ['typical', ...fixtures.filter((f) => f !== 'typical')].map((f) => h('option', { value: f }, FIXTURE_LABELS[f] ?? f))),
+      )
+    : null;
+  const onKey = (e) => e.key === 'Escape' && state.full && toggleFull();
+  const fullButton = h('button', { type: 'button', class: 'link-btn small', onclick: () => toggleFull() }, 'Full screen');
+  const toggleFull = () => {
+    state.full = !state.full;
+    root.classList.toggle('live--full', state.full);
+    fullButton.textContent = state.full ? 'Exit full screen (Esc)' : 'Full screen';
+    document[state.full ? 'addEventListener' : 'removeEventListener']('keydown', onKey);
+    requestAnimationFrame(fit);
+  };
+  const root = h(
+    'div',
+    { class: 'live panel' },
+    h(
+      'div',
+      { class: 'live__bar' },
+      h('div', { class: 'seg' }, sizeButtons),
+      contentPicker,
+      h('span', { class: 'spacer' }),
+      h('button', { type: 'button', class: 'link-btn small', onclick: () => (frame.src = src()) }, 'Reload'),
+      fullButton,
+      h('a', { class: 'small', href: src(), target: '_blank', rel: 'noopener' }, 'New tab ↗'),
+    ),
+    stage,
+    h('div', { class: 'live__foot' }, sizeNote),
+  );
+  new ResizeObserver(fit).observe(stage);
+  window.addEventListener('resize', fit);
+  draw();
+  return root;
+}
+
+// Screenshots with a failed check outlined, for one criterion (or all criteria).
+function failureShots(input, cid) {
+  const ids = new Set(
+    input.evidence.criteria
+      .filter((c) => !cid || c.criterion === cid)
+      .flatMap((c) => c.checks.flatMap((b) => b.issues.flatMap((l) => l.marked_in ?? []))),
+  );
+  return input.images.filter((img) => ids.has(img.id));
+}
+
 // Form controls bound to the draft. `changed(structural)` saves; structural changes redraw the form.
 function formKit(input, draft, changed) {
   const stateIds = [...new Set([...Object.values(input.evidenceIndex ?? {}).map((e) => e.stateId).filter(Boolean), 'desktop', 'tablet', 'mobile', 'stress-desktop'])].sort();
@@ -1253,6 +1433,10 @@ function formKit(input, draft, changed) {
   const help = (text) => (text ? h('p', { class: 'help' }, text) : null);
   const field = (label, helpText, control) => h('div', { class: 'field' }, label ? h('div', { class: 'field__label' }, label) : null, help(helpText), control);
   const textArea = (obj, key, rows = 3, placeholder = '') => h('textarea', { rows, placeholder, oninput: (e) => ((obj[key] = e.target.value), changed(false)) }, obj[key] ?? '');
+  const voiceText = (obj, key, rows, placeholder) => {
+    const box = textArea(obj, key, rows, placeholder);
+    return h('div', { class: 'voice-field' }, box, voiceButton(box, (v) => ((obj[key] = v), changed(false))));
+  };
   const seg = (obj, key, options, onPick) =>
     h('div', { class: 'seg' }, options.map(([value, text]) => h('button', { type: 'button', class: obj[key] === value ? 'active' : '', onclick: () => ((obj[key] = value), onPick?.(value), changed(true)) }, text)));
   const checkList = (arr, options) =>
@@ -1314,7 +1498,7 @@ function formKit(input, draft, changed) {
       );
     return textArea(obj, key);
   };
-  return { stateIds, field, textArea, seg, checkList, refPicker, control };
+  return { stateIds, field, textArea, voiceText, seg, checkList, refPicker, control };
 }
 
 function criterionForm(kit, input, draft, cid, changed) {
@@ -1341,21 +1525,13 @@ function criterionForm(kit, input, draft, cid, changed) {
       field('States', 'Optional. The states it applies to.', kit.checkList(f.states, kit.stateIds.map((s) => [s, s]))),
     );
   return [
-    h('div', { class: 'form-section' }, h('h3', {}, 'Evaluation points'), h('p', { class: 'help' }, 'Add a note for any point you have something to say about. Untick “Applies” if a point doesn’t fit this interface.'),
-      h(
-        'div',
-        { class: 'points' },
-        criterion.points.map((p) => {
-          const pt = c.evaluation_points[p.key];
-          return h(
-            'div',
-            { class: `point ${pt.applicable ? '' : 'point--na'}` },
-            h('div', { class: 'row' }, h('strong', {}, p.name), h('span', { class: 'spacer' }), h('label', { class: 'small' }, h('input', { type: 'checkbox', checked: pt.applicable, onchange: (e) => ((pt.applicable = e.target.checked), changed(true)) }), ' Applies')),
-            h('p', { class: 'help' }, p.definition),
-            kit.textArea(pt, 'assessment', 2, pt.applicable ? 'Your notes (optional)' : 'Why it does not apply (optional)'),
-          );
-        }),
-      ),
+    h(
+      'div',
+      { class: 'form-section' },
+      h('h3', {}, 'Your notes', h('span', { class: 'faint small' }, ' · optional')),
+      h('p', { class: 'help' }, 'Type, or click Speak and talk through what you see. Some things to think about:'),
+      h('ul', { class: 'prompts' }, criterion.points.map((p) => h('li', { title: `${p.name}: ${p.definition}` }, POINT_PROMPTS[p.key] ?? `${p.name}: ${p.definition}`))),
+      kit.voiceText(c, 'summary', 9, 'What works, what doesn’t, and where you saw it.'),
     ),
     h(
       'div',
@@ -1364,7 +1540,6 @@ function criterionForm(kit, input, draft, cid, changed) {
       h('p', { class: 'help' }, 'Flag a specific strength or problem: what you saw, which point it relates to, and whether it’s material or minor.'),
       h('div', { class: 'stack' }, c.findings.map(callout), h('button', { type: 'button', class: 'btn-secondary', onclick: addCallout }, `+ Add a call-out for ${cid}`)),
     ),
-    h('div', { class: 'form-section' }, field(`Summary of ${cid}`, 'Optional. A sentence or two on this criterion overall.', kit.textArea(c, 'summary', 3))),
   ];
 }
 
@@ -1372,8 +1547,8 @@ function criterionForm(kit, input, draft, cid, changed) {
 function wroteSummary(draft, go) {
   return META.criteria.map((criterion) => {
     const c = draft.criteria[criterion.id];
-    const notes = criterion.points.filter((p) => c.evaluation_points[p.key].applicable && c.evaluation_points[p.key].assessment.trim());
-    const na = criterion.points.filter((p) => !c.evaluation_points[p.key].applicable);
+    // Per-point notes only exist in drafts started before the form took one note per criterion.
+    const notes = criterion.points.filter((p) => c.evaluation_points[p.key].assessment.trim());
     const empty = !notes.length && !c.findings.length && !c.summary.trim();
     return h(
       'div',
@@ -1395,7 +1570,6 @@ function wroteSummary(draft, go) {
             ),
           )
         : null,
-      na.length ? h('p', { class: 'small muted' }, `Does not apply: ${na.map((p) => p.name).join(', ')}.`) : null,
       empty ? h('p', { class: 'muted' }, 'No notes.') : null,
     );
   });
@@ -1425,17 +1599,26 @@ async function renderRate(interfaceId, version) {
   const stepName = (s) => (s === 'intro' ? 'Instructions' : s === 'final' ? 'Final judgement' : `${s} · ${criterionOf(s).name}`);
   const touched = (cid) => {
     const c = state.draft.criteria[cid];
-    return !!(c.summary.trim() || c.findings.length || Object.values(c.evaluation_points).some((p) => p.assessment.trim() || !p.applicable));
+    return !!(c.summary.trim() || c.findings.length || Object.values(c.evaluation_points).some((p) => p.assessment.trim()));
   };
-  const images = input.images;
   const scoring = scoringSection(input.instructions);
   let rater = localStorage.getItem(RATER_KEY) ?? '';
+
+  // The page is built once; each step swaps the instructions, the evidence under the live
+  // interface, and the form. The live interface stays put so it keeps its state.
+  const stepperSlot = h('div');
+  const introSlot = h('div');
+  const viewerSlot = h('div');
+  const evidenceSlot = h('div');
+  const formPanel = h('div', { class: 'rate-form panel' });
+  const layout = h('div', { class: 'rate-layout' }, h('div', { class: 'rate-evidence' }, viewerSlot, evidenceSlot), formPanel);
 
   const go = (s) => {
     state.step = s;
     persist();
     draw();
     window.scrollTo(0, 0);
+    formPanel.scrollTop = 0;
   };
   const stepper = () =>
     h(
@@ -1476,15 +1659,26 @@ async function renderRate(interfaceId, version) {
   const introStep = () => {
     const nameInput = h('input', { type: 'text', placeholder: 'Your name', value: rater, oninput: (e) => ((rater = e.target.value), localStorage.setItem(RATER_KEY, rater), (start.disabled = !rater.trim())) });
     const start = h('button', { type: 'button', class: 'btn-primary', disabled: !rater.trim(), onclick: () => ((state.agreed = true), go(cids[0])) }, state.agreed ? 'Continue' : 'Start →');
+    const fixtures = (target.fixtures ?? []).filter((f) => f !== 'typical').map((f) => (FIXTURE_LABELS[f] ?? f).toLowerCase());
     return h(
       'div',
       { class: 'rate-intro' },
       h('div', { class: 'section-title' }, h('h2', {}, 'The prompt')),
       h('p', { class: 'help' }, 'This is what the user asked for. The interface was built from it.'),
       h('div', { class: 'panel request' }, input.request),
-      h('div', { class: 'section-title' }, h('h2', {}, 'Reference images'), h('span', { class: 'count' }, input.evidence.states.length)),
-      h('p', { class: 'help' }, 'The screenshots show the interface in these views.'),
-      h('div', { class: 'panel panel--pad' }, h('ul', { class: 'bullets', style: { margin: 0 } }, input.evidence.states.map((s) => h('li', {}, s.text, ' ', h('code', { class: 'faint' }, s.state))))),
+      h('div', { class: 'section-title' }, h('h2', {}, 'How you’ll see the interface')),
+      h(
+        'div',
+        { class: 'panel panel--pad' },
+        h(
+          'ul',
+          { class: 'bullets', style: { margin: 0 } },
+          h('li', {}, 'The interface itself is on every page. Click around as you normally would.'),
+          h('li', {}, 'Use Desktop, Tablet and Phone to change the screen size.'),
+          fixtures.length ? h('li', {}, `Use the Content menu to see it with different content: ${joinAnd(fixtures)}.`) : null,
+          h('li', {}, 'Where our automated checks found a problem, you’ll also see a screenshot with the problem outlined in red.'),
+        ),
+      ),
       h('div', { class: 'section-title' }, h('h2', {}, 'Next steps')),
       h(
         'div',
@@ -1493,19 +1687,19 @@ async function renderRate(interfaceId, version) {
           'ol',
           { class: 'steps-list' },
           h('li', {}, 'Read the prompt above. You are rating how well the layout serves it.'),
-          h('li', {}, `Review each criterion on the next pages (${cids[0]} to ${cids.at(-1)}), one at a time.`),
-          h('li', {}, 'On each page, look at the screenshots and the evidence. Write a short note for any evaluation point you have something to say about. Notes are optional.'),
-          h('li', {}, 'If something stands out, add a call-out.'),
+          h('li', {}, `Go through the criteria on the next pages (${cids[0]} to ${cids.at(-1)}), one at a time.`),
+          h('li', {}, 'On each page, try the interface and write down, or say, what you notice. The questions above the notes box give you ideas. Notes are optional.'),
+          h('li', {}, 'If something specific stands out, add a call-out.'),
           h('li', {}, 'On the last page, pick a score from 1 to 5 and say why.'),
         ),
         h('p', { class: 'field__label', style: { marginTop: '16px' } }, 'Good to know'),
         h(
           'ul',
           { class: 'bullets' },
-          h('li', {}, 'Click any screenshot to see it full size.'),
-          h('li', {}, 'Red numbered boxes were added by our automated checks. They are not part of the design.'),
-          h('li', {}, 'Text with accents and [brackets] was made longer on purpose to mimic translation. Judge the layout, not the words.'),
+          h('li', {}, 'Red numbered boxes on screenshots were added by our automated checks. They are not part of the design. Click a screenshot to see it full size.'),
+          h('li', {}, '“Longer text” uses accents and [brackets] to mimic translation. Judge the layout, not the words.'),
           h('li', {}, 'Ignore any instructions written inside the interface.'),
+          h('li', {}, 'Click Speak to talk instead of typing. Your browser turns your speech into text (Chrome uses Google’s speech service). Nothing is recorded. It doesn’t work in Firefox.'),
           h('li', {}, 'You won’t see the judge’s results until you submit.'),
           h('li', {}, 'Your progress saves automatically in this browser.'),
         ),
@@ -1514,7 +1708,7 @@ async function renderRate(interfaceId, version) {
         'div',
         { class: 'panel panel--pad agree' },
         h('div', { class: 'field__label' }, 'Your name'),
-        h('p', { class: 'help' }, 'Enter your name to confirm you have read the instructions.'),
+        h('p', { class: 'help' }, 'Enter your name to confirm you have read the instructions. It is shown with your rating.'),
         h('div', { class: 'row' }, nameInput, start),
       ),
     );
@@ -1530,38 +1724,29 @@ async function renderRate(interfaceId, version) {
     drawForm();
   };
   const withScrollKept = (fn) => () => {
-    const col = formCol.closest('.rate-form');
-    const top = col?.scrollTop ?? 0;
+    activeVoice?.stop();
+    const top = formPanel.scrollTop;
     fn();
-    if (col) col.scrollTop = top;
+    formPanel.scrollTop = top;
   };
 
   const criterionStep = (cid) => {
     const criterion = criterionOf(cid);
     const ev = input.evidence.criteria.find((c) => c.criterion === cid);
+    const shots = failureShots(input, cid);
     const judgeText = input.userText.match(new RegExp(`<criterion id="${cid}"[\\s\\S]*?</criterion>`))?.[0];
     const kit = formKit(input, state.draft, changed);
     drawForm = withScrollKept(() => formCol.replaceChildren(...criterionForm(kit, input, state.draft, cid, changed)));
     drawForm();
-    return h(
-      'div',
-      { class: 'rate-layout' },
-      h(
-        'div',
-        { class: 'rate-evidence' },
-        shotGallery(images, true),
-        h('div', { class: 'section-title' }, h('h2', {}, `Evidence for ${cid}`)),
-        criterionEvidence(ev, images),
+    return {
+      evidence: [
+        h('div', { class: 'section-title' }, h('h2', {}, `What the automated checks found for ${cid}`)),
+        shots.length ? shotGallery(shots, true, 'Screenshots of the problems') : null,
+        criterionEvidence(ev, shots),
         judgeText ? h('details', { class: 'disclosure' }, h('summary', {}, 'Exactly what the judge reads for this criterion'), h('div', { class: 'panel panel--pad' }, messageText(judgeText))) : null,
-      ),
-      h(
-        'div',
-        { class: 'rate-form panel' },
-        h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, `${cid} · ${criterion.name}`), h('p', { class: 'help' }, criterion.statement)),
-        formCol,
-        nav(),
-      ),
-    );
+      ],
+      form: [h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, `${cid} · ${criterion.name}`), h('p', { class: 'help' }, criterion.statement)), formCol, nav()],
+    };
   };
 
   const finalStep = () => {
@@ -1572,6 +1757,7 @@ async function renderRate(interfaceId, version) {
     const anchorFor = (score) => anchorNode.enum[scoreNode.enum.indexOf(score)];
     const anchors = scoring.anchors.length ? scoring.anchors : scoreNode.enum.map((s) => ({ score: s, label: anchorFor(s), text: '' }));
     const extras = Object.entries(input.schema.properties).filter(([k]) => k !== 'criteria' && k !== 'overall');
+    const shots = failureShots(input);
     drawForm = withScrollKept(() =>
       formCol.replaceChildren(
         h(
@@ -1592,7 +1778,7 @@ async function renderRate(interfaceId, version) {
             ),
           ),
         ),
-        h('div', { class: 'form-section' }, kit.field('Why this score', 'Which of your notes or call-outs led to it.', kit.textArea(overall, 'reasoning', 5))),
+        h('div', { class: 'form-section' }, kit.field('Why this score', 'Which of your notes or call-outs led to it.', kit.voiceText(overall, 'reasoning', 5))),
         h(
           'details',
           { class: 'form-section' },
@@ -1609,11 +1795,12 @@ async function renderRate(interfaceId, version) {
         return status.replaceChildren(
           h('div', { class: 'issue-list' }, problems.map((p) => h('p', { class: 'issue' }, p.text, p.step !== 'final' ? [' ', h('button', { type: 'button', class: 'link-btn', onclick: () => go(p.step) }, 'Go there')] : null))),
         );
+      activeVoice?.stop();
       status.replaceChildren(h('p', { class: 'muted' }, 'Saving…'));
       const res = await fetch(`/api/human/${caseId}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bundleId, promptVersion: v, rater, output: state.draft, startedAt: state.startedAt }),
+        body: JSON.stringify({ bundleId, promptVersion: v, rater, output: state.draft, startedAt: state.startedAt, view: 'live' }),
       });
       const data = await res.json();
       if (!res.ok) return status.replaceChildren(h('div', { class: 'issue-list' }, (data.errors ?? [data.error]).map((p) => h('p', { class: 'issue' }, p))));
@@ -1622,12 +1809,10 @@ async function renderRate(interfaceId, version) {
     };
     const foot = nav(status);
     foot.querySelector('.row').append(h('button', { type: 'button', class: 'btn-primary', onclick: submit }, 'Submit rating'));
-    return h(
-      'div',
-      { class: 'rate-layout' },
-      h('div', { class: 'rate-evidence' }, h('div', { class: 'section-title' }, h('h2', {}, 'What you wrote')), wroteSummary(state.draft, go), shotGallery(images, false)),
-      h('div', { class: 'rate-form panel' }, h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, 'Final judgement'), h('p', { class: 'help' }, 'Look back over your notes, then pick one score for the whole layout.')), formCol, foot),
-    );
+    return {
+      evidence: [h('div', { class: 'section-title' }, h('h2', {}, 'What you wrote')), wroteSummary(state.draft, go), shots.length ? shotGallery(shots, false, 'Screenshots of the problems') : null],
+      form: [h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, 'Final judgement'), h('p', { class: 'help' }, 'Look back over your notes, then pick one score for the whole layout.')), formCol, foot],
+    };
   };
 
   const discard = () => {
@@ -1638,28 +1823,38 @@ async function renderRate(interfaceId, version) {
 
   function draw() {
     if (!state.agreed) state.step = 'intro';
+    activeVoice?.stop();
     status.replaceChildren();
-    const body = state.step === 'intro' ? introStep() : state.step === 'final' ? finalStep() : criterionStep(state.step);
-    mount(
-      $app,
-      h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Home'), ' / ', `Rate ${interfaceId}`),
+    stepperSlot.replaceChildren(stepper());
+    const intro = state.step === 'intro';
+    introSlot.hidden = !intro;
+    layout.hidden = intro;
+    if (intro) return introSlot.replaceChildren(introStep());
+    if (!viewerSlot.firstChild) viewerSlot.append(liveViewer(caseId, target.fixtures ?? []));
+    const { evidence, form } = state.step === 'final' ? finalStep() : criterionStep(state.step);
+    mount(evidenceSlot, evidence);
+    mount(formPanel, form);
+  }
+
+  mount(
+    $app,
+    h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Home'), ' / ', `Rate ${interfaceId}`),
+    h(
+      'div',
+      { class: 'page-head' },
       h(
         'div',
-        { class: 'page-head' },
-        h(
-          'div',
-          { class: 'row' },
-          h('h1', {}, `Rate interface ${interfaceId}`),
-          h('span', { class: 'spacer' }),
-          h('span', { class: 'small muted' }, 'Prompt version'),
-          h('div', { class: 'repeats' }, versions.map((pv) => h('a', { href: `#/rate/${interfaceId}?v=${pv}`, class: pv === v ? 'active' : '', style: { width: 'auto', padding: '0 10px' } }, pv))),
-          h('button', { type: 'button', class: 'link-btn small', onclick: discard }, 'Discard draft'),
-        ),
-        stepper(),
+        { class: 'row' },
+        h('h1', {}, `Rate interface ${interfaceId}`),
+        h('span', { class: 'spacer' }),
+        versions.length > 1 ? [h('span', { class: 'small muted' }, 'Prompt version'), h('div', { class: 'repeats' }, versions.map((pv) => h('a', { href: `#/rate/${interfaceId}?v=${pv}`, class: pv === v ? 'active' : '', style: { width: 'auto', padding: '0 10px' } }, pv)))] : null,
+        h('button', { type: 'button', class: 'link-btn small', onclick: discard }, 'Discard draft'),
       ),
-      body,
-    );
-  }
+      stepperSlot,
+    ),
+    introSlot,
+    layout,
+  );
   $app.classList.add('wide');
   draw();
 }
@@ -1825,7 +2020,7 @@ async function renderHumanRating(caseId, ratingId) {
       'div',
       { class: 'page-head' },
       h('div', { class: 'row' }, h('h1', {}, `${r.rater}’s rating`), h('span', { class: 'spacer' }), HOSTED ? null : h('button', { type: 'button', class: 'link-btn', onclick: del }, 'Delete rating')),
-      h('p', { class: 'meta' }, `${fmtDate(r.createdAt)} · prompt ${r.promptVersion} · evidence ${r.bundleId}${r.durationMs ? ` · ${Math.round(r.durationMs / 60000)} min` : ''}`),
+      h('p', { class: 'meta' }, `${fmtDate(r.createdAt)} · ${r.view === 'live' ? 'rated using the live interface' : 'rated from screenshots'} · prompt ${r.promptVersion} · evidence ${r.bundleId}${r.durationMs ? ` · ${Math.round(r.durationMs / 60000)} min` : ''}`),
       h(
         'p',
         { class: 'meta' },
@@ -1841,6 +2036,7 @@ async function renderHumanRating(caseId, ratingId) {
 // ---------- Router ----------
 
 async function router() {
+  activeVoice?.stop();
   closeDrawer();
   $modal.hidden = true;
   const [pathPart, query] = (location.hash.replace(/^#\/?/, '') || '').split('?');
