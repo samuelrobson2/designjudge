@@ -1,0 +1,11 @@
+{
+  "id": "cramped-line-height",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Multi-line text with cramped line-height",
+  "symptom": "Paragraphs and treatment descriptions use a line-height of 1.05, so wrapped lines nearly touch.",
+  "where": {},
+  "severity": "moderate",
+  "css": "p, .lede, .option-card__desc, .empty-state__body { line-height: 1.05 !important; }",
+  "js": null
+}

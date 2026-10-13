@@ -8,6 +8,7 @@ export const DIAGNOSTIC_HOME: Record<string, string> = {
   region_overlap: 'C',
   collapsed_dimensions: 'C',
   occluded_content: 'C',
+  media_fit: 'C',
   page_horizontal_overflow: 'D',
   interactive_reachability: 'D',
   responsive_layout_failures: 'D',

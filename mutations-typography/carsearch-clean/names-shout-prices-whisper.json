@@ -1,0 +1,17 @@
+{
+  "id": "names-shout-prices-whisper",
+  "case": "carsearch-clean",
+  "kind": "defect",
+  "title": "Car names outshout the page title while prices shrink to grey body text",
+  "symptom": "Every car name is 30 px at weight 800, larger than the 28 px page title and the 20 px results heading, while each price drops to 14 px regular in the muted grey of the specs, so the strongest emphasis on the page falls on twelve car names and the prices a buyer compares are the least prominent figures on each card.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "severe",
+  "css": ".car__title { font-size: 30px !important; font-weight: 800 !important; line-height: 1.15; }\n.car__price { font-size: 14px !important; font-weight: 400 !important; color: var(--muted); margin-top: 2px; }",
+  "js": null
+}

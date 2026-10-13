@@ -1,0 +1,11 @@
+{
+  "css": ".car__rating--great { color: #8fd0a6; } .car__rating--good { color: #9ab8f0; }",
+  "js": null,
+  "case": "carsearch-clean",
+  "id": "price-ratings-washed-out",
+  "kind": "defect",
+  "title": "Price ratings drawn in pale text on pale tints",
+  "symptom": "The \"Great price\" and \"Good price\" ratings and their \"£… below average\" text are recoloured to pale green and pale blue, about 1.8–2.2:1, so whether a car is a good deal is hard to read.",
+  "where": {},
+  "severity": "moderate"
+}

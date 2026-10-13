@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll(\".results__note, .empty__body\").forEach((el) => { const to = {\"Price ratings compare each car with the average price of the same model, age and mileage.\":\"Each price rating compares the car with the average price of cars of the same model, age and mileage.\",\"Try a wider distance, or check a different postcode.\":\"Try searching a wider distance, or check your postcode.\",\"Remove a filter, or search a wider distance.\":\"Remove a filter, or try a wider distance.\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "carsearch-clean",
+  "id": "harmless-reworded-note",
+  "kind": "harmless",
+  "title": "Results note and empty-state advice reworded",
+  "symptom": "The note above the results and the empty-state advice say the same things in other words (\"Each price rating compares the car with the average price of cars of the same model, age and mileage.\").",
+  "where": {},
+  "severity": "none"
+}

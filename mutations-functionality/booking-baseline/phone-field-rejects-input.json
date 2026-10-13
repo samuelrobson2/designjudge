@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('input', (e) => { if (e.target.id === 'phone') e.target.value = e.target.value.replace(/[^+]/g, ''); }, true);",
+  "case": "booking-baseline",
+  "id": "phone-field-rejects-input",
+  "kind": "defect",
+  "title": "Phone field rejects every character",
+  "symptom": "An over-strict input mask strips every character typed into the Phone field, so it stays empty whatever the user types.",
+  "where": {},
+  "severity": "moderate"
+}

@@ -19,6 +19,7 @@ import type {
   Bundle,
   CaseManifest,
   CoverageEntry,
+  RenderedFont,
   ScreenshotRecord,
   ShiftEntry,
   Snapshot,
@@ -27,12 +28,12 @@ import type {
   Step,
 } from '../types.ts';
 import { ensureDir, hashDir, log, mapLimit, pngSize, sha256, timestampId, writeJson } from '../util.ts';
-import { initScript, snapshotScript } from './pageScripts.ts';
+import { initScript, quietScript, snapshotScript } from './pageScripts.ts';
 import { serveStatic, type StaticServer } from './server.ts';
-import { NetworkTracker, waitForSettled } from './settle.ts';
-import { runStep } from './steps.ts';
+import { NetworkTracker, quiesce, watchNetwork } from './settle.ts';
+import { runStep, withoutDurations } from './steps.ts';
 import { fillForStress } from './stress.ts';
-import { discoverOnPage, type Attempt } from './discover.ts';
+import { discoverCombinations, discoverOnPage, type Attempt } from './discover.ts';
 
 interface PlannedState {
   id: string;
@@ -124,7 +125,7 @@ export function planStates(manifest: CaseManifest): { planned: PlannedState[]; c
   return { planned, coverage };
 }
 
-async function newContext(browser: Browser, vp: ViewportSpec, width = vp.width, height = vp.height): Promise<BrowserContext> {
+export async function newContext(browser: Browser, vp: ViewportSpec, width = vp.width, height = vp.height): Promise<BrowserContext> {
   return browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: vp.deviceScaleFactor,
@@ -164,25 +165,80 @@ function injectionScript(inject: Injection): string {
   })()`;
 }
 
-async function preparePage(ctx: BrowserContext, fixture: FixtureName | null, inject?: Injection): Promise<Page> {
+// DJ_CPU_THROTTLE slows the page's main thread by that factor (the determinism suite).
+async function throttle(ctx: BrowserContext, page: Page): Promise<void> {
+  const rate = Number(process.env.DJ_CPU_THROTTLE ?? '1');
+  if (!(rate > 1)) return;
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate });
+  // The throttle lasts only as long as its session.
+  (page as unknown as { __djThrottle: unknown }).__djThrottle = cdp;
+}
+
+// The page's clock is installed paused at the fixed time, with Date held there: timers and
+// animation frames run only when a wait gives the page time (settle.ts).
+export async function preparePage(ctx: BrowserContext, fixture: FixtureName | null, inject?: Injection): Promise<Page> {
   const page = await ctx.newPage();
-  await page.clock.setFixedTime(new Date(FIXED_TIME));
+  await throttle(ctx, page);
+  const fixed = new Date(FIXED_TIME);
+  await page.clock.install({ time: fixed });
+  await page.clock.pauseAt(fixed);
+  await page.clock.setFixedTime(fixed);
+  watchNetwork(page);
+  await page.addInitScript({ content: await quietScript() });
   await page.addInitScript({ content: await initScript(fixture) });
   if (inject && (inject.css || inject.js)) await page.addInitScript({ content: injectionScript(inject) });
   await page.addInitScript({ content: await snapshotScript() });
   return page;
 }
 
-// The snapshot, then the occlusion probe (which scrolls through the page and restores the scroll
-// position). Safe-area insets are passed only when they were applied.
+// The natural sizes of background images (read by the snapshot), the snapshot, then the occlusion
+// probe (which scrolls through the page and restores the scroll position). Safe-area insets are
+// passed only when they were applied.
 async function takeSnapshot(page: Page, insets: Insets | null = null): Promise<Snapshot> {
+  try {
+    await page.evaluate('window.__djBackgroundSizes()');
+  } catch (err) {
+    log(`  ! background-size probe failed: ${(err as Error).message.split('\n')[0]}`);
+  }
   const snap = (await page.evaluate(`window.__djSnapshot(${ELEMENT_CAP})`)) as Snapshot;
   try {
     snap.occlusion = (await page.evaluate(`window.__djOcclusion(${JSON.stringify(insets)})`)) as Snapshot['occlusion'];
   } catch (err) {
     log(`  ! occlusion probe failed: ${(err as Error).message.split('\n')[0]}`);
   }
+  try {
+    snap.renderedFonts = await renderedFonts(page);
+  } catch (err) {
+    log(`  ! rendered-font probe failed: ${(err as Error).message.split('\n')[0]}`);
+  }
   return snap;
+}
+
+const MAX_FONT_SAMPLES = 24;
+
+// Which fonts Chromium rendered each sample's text with (a declared web font that failed to load
+// shows up as its fallback).
+async function renderedFonts(page: Page): Promise<RenderedFont[]> {
+  const samples = (await page.evaluate(`window.__djFontSamples(${MAX_FONT_SAMPLES})`)) as Omit<RenderedFont, 'fonts'>[];
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    await cdp.send('DOM.getDocument', { depth: 0 });
+    const out: RenderedFont[] = [];
+    for (let i = 0; i < samples.length; i++) {
+      const { result } = await cdp.send('Runtime.evaluate', { expression: `window.__djFontSampleEls[${i}]` });
+      if (!result.objectId) continue;
+      const { nodeId } = await cdp.send('DOM.requestNode', { objectId: result.objectId });
+      const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+      out.push({ ...samples[i], fonts: fonts.map((f) => ({ family: f.familyName, glyphs: f.glyphCount, custom: f.isCustomFont })) });
+    }
+    await cdp.send('Runtime.evaluate', { expression: 'delete window.__djFontSampleEls' });
+    return out;
+  } finally {
+    await cdp.detach().catch(() => {});
+  }
 }
 
 async function screenshot(
@@ -292,29 +348,22 @@ async function collectFreshState(
       }
     }
 
-    const navStart = Date.now();
     await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
-    record.settle = await waitForSettled(page, tracker);
-    if (state.kind === 'baseline') {
-      const remaining = SETTLE.stabilityWindowMs - (Date.now() - navStart);
-      if (remaining > 0) {
-        await page.waitForTimeout(remaining);
-        await waitForSettled(page, tracker, true);
-      }
-      record.layoutShifts = (await page.evaluate('window.__djShifts')) as ShiftEntry[];
-    }
+    // The load's page time is also the window in which layout shifts are recorded.
+    record.settle = await quiesce(page, 'load');
+    if (state.kind === 'baseline') record.layoutShifts = (await page.evaluate('window.__djShifts')) as ShiftEntry[];
 
     await page.evaluate('window.__djScrollThrough()');
-    await waitForSettled(page, tracker, true);
+    await quiesce(page, 'action');
 
     if (state.fixture === 'stress') {
       record.stressFill = await fillForStress(page, async () => {
         await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
-        await waitForSettled(page, tracker);
+        await quiesce(page, 'load');
       });
       if (record.stressFill.actions.length) {
         await page.evaluate('window.__djScrollThrough()');
-        await waitForSettled(page, tracker, true);
+        await quiesce(page, 'action');
       }
     }
 
@@ -327,7 +376,7 @@ async function collectFreshState(
         } catch (err) {
           const lines = (err as Error).message.split('\n').map((l) => l.trim()).filter(Boolean);
           // Keep Playwright's last call-log lines: they say why the action could not proceed.
-          const detail = [lines[0], ...lines.slice(1).filter((l) => l.startsWith('-')).slice(-3)].join(' ');
+          const detail = withoutDurations([lines[0], ...lines.slice(1).filter((l) => l.startsWith('-')).slice(-3)].join(' '));
           record.steps.push({ step, ok: false, error: detail });
           throw new Error(`Interactive step failed: ${JSON.stringify(step)}: ${detail}`);
         }
@@ -335,7 +384,7 @@ async function collectFreshState(
     }
 
     await page.evaluate('window.scrollTo(0, 0)');
-    await waitForSettled(page, null, true);
+    await quiesce(page, 'brief');
 
     const snap = await takeSnapshot(page, safeAreaApplied && state.viewport.safeArea ? state.viewport.safeArea : null);
     const snapFile = path.join(stateDir, 'snapshot.json');
@@ -346,10 +395,10 @@ async function collectFreshState(
       await page.evaluate(
         `(() => { const el = document.querySelector(${JSON.stringify(state.interactive.captureScrollTo)}); if (el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - 16)); })()`,
       );
-      await waitForSettled(page, null, true);
+      await quiesce(page, 'brief');
     } else if (state.interactive?.captureY) {
       await page.evaluate(`window.scrollTo(0, ${Math.max(0, state.interactive.captureY - 16)})`);
-      await waitForSettled(page, null, true);
+      await quiesce(page, 'brief');
     }
     record.screenshots.push(await screenshot(page, stateDir, bundleDir, `S-${state.id}-viewport`, 'viewport'));
     await page.evaluate('window.scrollTo(0, 0)');
@@ -367,7 +416,7 @@ async function collectFreshState(
       const maxY = Math.max(0, snap.doc.scrollHeight - state.viewport.height);
       const y = hidden.scrollY >= 0 ? hidden.scrollY : Math.round(hiddenEl.rect.y + hiddenEl.rect.h / 2 - state.viewport.height / 2);
       await page.evaluate(`window.scrollTo({ top: ${Math.min(maxY, Math.max(0, y))}, left: 0, behavior: 'instant' })`);
-      await waitForSettled(page, null, true);
+      await quiesce(page, 'brief');
       record.screenshots.push(await screenshot(page, stateDir, bundleDir, `S-${state.id}-scrolled`, 'scrolled'));
       await page.evaluate(`window.scrollTo({ top: 0, left: 0, behavior: 'instant' })`);
     }
@@ -397,7 +446,7 @@ async function collectFreshState(
     record.network = { external: [...tracker.external], failed: tracker.failed };
   } catch (err) {
     record.status = 'error';
-    record.error = (err as Error).message.split('\n')[0];
+    record.error = withoutDurations((err as Error).message.split('\n')[0]);
   } finally {
     await ctx.close();
   }
@@ -410,10 +459,10 @@ async function collectSweep(browser: Browser, url: string, origin: string, bundl
   const records: StateRecord[] = [];
   try {
     const page = await preparePage(ctx, fixture, inject);
-    const tracker = new NetworkTracker(page, origin);
     await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
-    await waitForSettled(page, tracker);
+    await quiesce(page, 'load');
     await page.evaluate('window.__djScrollThrough()');
+    await quiesce(page, 'action');
     for (const width of SWEEP_WIDTHS) {
       const id = `sweep-${width}`;
       const stateDir = ensureDir(path.join(bundleDir, 'states', id));
@@ -433,7 +482,7 @@ async function collectSweep(browser: Browser, url: string, origin: string, bundl
       try {
         await page.setViewportSize({ width, height: SWEEP_HEIGHT });
         await page.evaluate('window.scrollTo(0, 0)');
-        record.settle = await waitForSettled(page, tracker, true);
+        record.settle = await quiesce(page, 'brief');
         const snap = await takeSnapshot(page);
         const snapFile = path.join(stateDir, 'snapshot.json');
         writeJson(snapFile, snap);
@@ -444,7 +493,7 @@ async function collectSweep(browser: Browser, url: string, origin: string, bundl
         await page.evaluate('window.scrollTo(0, 0)');
       } catch (err) {
         record.status = 'error';
-        record.error = (err as Error).message.split('\n')[0];
+        record.error = withoutDurations((err as Error).message.split('\n')[0]);
       }
       records.push(record);
     }
@@ -457,16 +506,20 @@ async function collectSweep(browser: Browser, url: string, origin: string, bundl
 export interface DiscoveryLog {
   viewport: 'desktop' | 'tablet' | 'mobile';
   chosen: { label: string; role: string; selector: string; description: string; score: number } | null;
-  // Further significant changes kept as supporting states (checked, no screenshot for the judge).
+  // The other distinct one-click states kept: shown like the first at desktop and mobile;
+  // supporting states (checked, no screenshot for the judge) at tablet.
   alsoKept?: { label: string; role: string; selector: string; description: string; score: number }[];
+  // States reached by more than one click, kept as supporting states.
+  combinations?: { tried: number; kept: { kind: 'sequence' | 'choices'; steps: string[]; description: string; score: number }[] };
   attempts: Attempt[];
   error?: string;
 }
 
-// Finds the most significant interactive states at each viewport by clicking every distinct
-// control. The largest change at desktop and mobile is the state the judge sees; the next ones,
-// and all of tablet, are supporting states that are checked but not shown.
-async function discoverInteractiveStates(
+// Finds the distinct interactive states one click away at each viewport by clicking every
+// distinct control (discover.ts). Those kept at desktop and mobile are the states the judges see
+// (collect/shown.ts); all of tablet, and the states reached by more than one click, are
+// supporting states that are checked but not shown.
+export async function discoverInteractiveStates(
   browser: Browser,
   url: string,
   origin: string,
@@ -483,18 +536,37 @@ async function discoverInteractiveStates(
         ctx.on('page', (p) => {
           if (p !== page) void p.close();
         });
-        const tracker = new NetworkTracker(page, origin);
         const reset = async () => {
           await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
-          await waitForSettled(page, tracker);
+          await quiesce(page, 'load');
         };
         await reset();
-        const { picks, attempts } = await discoverOnPage(page, reset);
+        const { picks, found, load, attempts } = await discoverOnPage(page, reset);
         log.attempts = attempts;
         const summary = (p: (typeof picks)[number]) => ({ label: p.candidate.label, role: p.candidate.role, selector: p.candidate.selector, description: p.description, score: p.change.score });
         if (!picks.length) return { log, planned: [] as PlannedState[] };
         log.chosen = summary(picks[0]);
         log.alsoKept = picks.slice(1).map(summary);
+        const combos = await discoverCombinations(page, reset, load, found);
+        const kept = [...combos.sequences, ...(combos.choices ? [combos.choices] : [])];
+        log.combinations = { tried: combos.tried, kept: kept.map((c) => ({ kind: c.kind, steps: c.steps.map((s) => s.label), description: c.description, score: c.change.score })) };
+        const combined: PlannedState[] = kept.map((c) => {
+          const n = c.kind === 'choices' ? '' : `-${combos.sequences.indexOf(c) + 1}`;
+          return {
+            id: `interactive-${c.kind === 'choices' ? 'choices' : 'steps'}-${vpId}${n}`,
+            kind: 'interactive',
+            label: c.kind === 'choices' ? `Choices applied (${vpId})` : `Two steps${n.replace('-', ' ')} (${vpId})`,
+            viewport: vp,
+            fixture,
+            interactive: {
+              id: 'auto',
+              description: c.description,
+              steps: c.steps.map((s) => ({ action: 'click' as const, selector: s.selector })),
+              captureY: c.change.focusY,
+            },
+            supporting: true,
+          };
+        });
         const planned: PlannedState[] = picks.map((p, i) => ({
           id: i === 0 ? `interactive-auto-${vpId}` : `interactive-auto-${vpId}-${i + 1}`,
           kind: 'interactive',
@@ -507,11 +579,11 @@ async function discoverInteractiveStates(
             steps: [{ action: 'click', selector: p.candidate.selector }],
             captureY: p.change.focusY,
           },
-          ...(i > 0 || vpId === 'tablet' ? { supporting: true } : {}),
+          ...(vpId === 'tablet' ? { supporting: true } : {}),
         }));
-        return { log, planned };
+        return { log, planned: [...planned, ...combined] };
       } catch (err) {
-        log.error = (err as Error).message.split('\n')[0];
+        log.error = withoutDurations((err as Error).message.split('\n')[0]);
         return { log, planned: [] as PlannedState[] };
       } finally {
         await ctx.close();
@@ -529,6 +601,11 @@ export interface CollectOptions {
   inject?: Injection;
   evidenceId?: string;
   interactiveFrom?: Bundle;
+  // Visual System probes (probes.ts); on unless false.
+  probes?: boolean;
+  // The Functionality probe, which uses every control, link and form; off unless true. Without it
+  // the evidence cannot be judged for Functionality.
+  functional?: boolean;
 }
 
 function replayInteractive(from: Bundle): PlannedState[] {
@@ -553,15 +630,22 @@ function replayInteractive(from: Bundle): PlannedState[] {
     });
 }
 
-export async function collectCase(manifest: CaseManifest, opts: CollectOptions = {}): Promise<Bundle> {
-  const dir = caseDir(manifest.id);
+export interface CaseTarget {
+  url: string;
+  origin: string;
+  inputsHash: string;
+  close(): Promise<void>;
+}
+
+// Serves a static case (or points at its URL) and hashes what was collected from.
+export async function openCaseTarget(manifest: CaseManifest): Promise<CaseTarget> {
   let server: StaticServer | null = null;
   let baseUrl: string;
   let inputsHash: string;
   // Display-only fields are left out, so renaming a case does not change its interface ID.
   const { title: _title, summary: _summary, ...hashedManifest } = manifest;
   if (manifest.source.type === 'static') {
-    const siteDir = path.join(dir, manifest.source.dir);
+    const siteDir = path.join(caseDir(manifest.id), manifest.source.dir);
     server = await serveStatic(siteDir);
     baseUrl = server.url;
     inputsHash = sha256(hashDir(siteDir) + JSON.stringify(hashedManifest) + COLLECTOR_VERSION);
@@ -570,7 +654,13 @@ export async function collectCase(manifest: CaseManifest, opts: CollectOptions =
     inputsHash = sha256(manifest.source.url + JSON.stringify(hashedManifest) + COLLECTOR_VERSION);
   }
   const url = new URL(manifest.entry ?? '/', baseUrl).toString();
-  const origin = new URL(url).origin;
+  return { url, origin: new URL(url).origin, inputsHash, close: async () => void (await server?.close()) };
+}
+
+export async function collectCase(manifest: CaseManifest, opts: CollectOptions = {}): Promise<Bundle> {
+  const target = await openCaseTarget(manifest);
+  const { url, origin } = target;
+  let inputsHash = target.inputsHash;
 
   if (opts.inject) inputsHash = sha256(inputsHash + JSON.stringify(opts.inject));
   const evidenceId = opts.evidenceId ?? manifest.id;
@@ -590,6 +680,7 @@ export async function collectCase(manifest: CaseManifest, opts: CollectOptions =
       for (const l of found.logs) {
         const tried = l.attempts.length;
         log(`  ${l.chosen ? '✓' : '·'} discovery ${l.viewport}: ${l.chosen ? l.chosen.description : 'no significant change'} (${tried} controls tried)`);
+        for (const c of l.combinations?.kept ?? []) log(`  ✓ discovery ${l.viewport}, ${c.kind === 'choices' ? 'choices applied' : 'two steps'}: ${c.description}`);
         if (!l.chosen) {
           coverage.push({
             stateId: `interactive-auto-${l.viewport}`,
@@ -650,10 +741,19 @@ export async function collectCase(manifest: CaseManifest, opts: CollectOptions =
       interactiveDiscovery: discovery,
     };
     writeJson(path.join(bundleDir, 'bundle.json'), bundle);
+    if (opts.probes !== false) {
+      const { collectProbes, describeTimings } = await import('./probes.ts');
+      try {
+        const timings = await collectProbes(browser, url, origin, bundle, bundleDir, opts.inject, { functional: opts.functional });
+        log(`  ✓ probes: ${describeTimings(timings)}`);
+      } catch (err) {
+        log(`  ! probes failed: ${(err as Error).message.split('\n')[0]}`);
+      }
+    }
     writeJson(path.join(EVIDENCE_DIR, evidenceId, 'latest.json'), { bundleId });
     return bundle;
   } finally {
     await browser.close();
-    if (server) await server.close();
+    await target.close();
   }
 }

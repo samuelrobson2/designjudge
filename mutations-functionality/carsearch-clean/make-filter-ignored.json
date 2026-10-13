@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "document.addEventListener('change', (e) => { if (e.target.matches && e.target.matches('[data-make]')) e.stopImmediatePropagation(); }, true);",
+  "case": "carsearch-clean",
+  "id": "make-filter-ignored",
+  "kind": "defect",
+  "title": "Ticking a make does not filter the results",
+  "symptom": "Ticking a make (for example \"Audi\") ticks the box, but the results, the count in the heading and the active-filter chips stay as they were, so the list shows every make while the filter says only one is wanted.",
+  "where": {
+    "interaction": "Tick a make in the filters"
+  },
+  "severity": "severe"
+}

@@ -1,0 +1,11 @@
+{
+  "css": ".card, .kpi { box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08); }",
+  "js": null,
+  "case": "dashboard-baseline",
+  "id": "harmless-card-elevation",
+  "kind": "harmless",
+  "title": "All cards get the same soft shadow",
+  "symptom": "Every card and KPI card gets one shared, subtle shadow, consistently.",
+  "where": {},
+  "severity": "none"
+}

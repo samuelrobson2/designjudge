@@ -92,6 +92,61 @@ export interface ElementRecord {
   svgOnlyDefs: boolean;
   labelFor: number | null;
   img: { complete: boolean; naturalWidth: number; naturalHeight: number } | null;
+  // Elements with their own text, and text form fields (whose value or placeholder is the text).
+  type?: TypeRecord;
+}
+
+export interface TypeRecord {
+  // Computed font-size, line-height and letter-spacing in CSS px; lineHeight is null for `normal`.
+  size: number;
+  weight: number;
+  family: string;
+  style: string;
+  lineHeight: number | null;
+  letterSpacing: number;
+  transform: string;
+  wrap: string;
+  align: string;
+  color: string;
+  // Characters of the element's own text (a field's value, else its placeholder).
+  chars: number;
+  // Rendered width of each line of text, top to bottom (at most 12); lines counts them all.
+  lines: number[];
+  lineCount: number;
+  // Content-box width of the nearest block container: the room the text has to wrap in.
+  avail: number;
+  // h1–h6 or aria-level on role=heading.
+  heading: number | null;
+  field?: 'value' | 'placeholder' | 'empty';
+}
+
+// The fonts Chromium actually rendered a sample of each computed font-family, weight and style with.
+export interface RenderedFont {
+  stack: string;
+  weight: number;
+  style: string;
+  sample: string;
+  fonts: { family: string; glyphs: number; custom: boolean }[];
+}
+
+// A picture (image, video frame, canvas bitmap, inline SVG drawing or background image) and how it
+// is fitted into the box it is drawn in.
+export interface PictureRecord {
+  id: number;
+  source: 'img' | 'video' | 'canvas' | 'svg' | 'background';
+  // Intrinsic size: CSS px for images and videos, the bitmap for a canvas, the viewBox for an SVG.
+  natural: [number, number];
+  // The content box (a background's positioning area), in CSS px.
+  box: [number, number];
+  // object-fit; an SVG's preserveAspectRatio as fill (none), contain (meet) or cover (slice); a
+  // background's background-size.
+  fit: string;
+  // object-position, preserveAspectRatio alignment or background-position, per axis.
+  position: [string, string];
+  // Backgrounds: whether the image repeats horizontally and vertically.
+  repeat?: [boolean, boolean];
+  // An empty alt, aria-hidden or presentation role, an unlabelled SVG, or a background with text on it.
+  decorative: boolean;
 }
 
 // Occlusion probe (collected in the page): content that can never be seen unobstructed.
@@ -134,6 +189,11 @@ export interface Snapshot {
   elements: ElementRecord[];
   truncated: boolean;
   occlusion?: OcclusionProbe;
+  // Absent in snapshots collected before pictures were captured.
+  pictures?: PictureRecord[];
+  renderedFonts?: RenderedFont[];
+  // Families the page declares with @font-face.
+  webFonts?: string[];
 }
 
 export interface ShiftSource {
@@ -160,8 +220,11 @@ export type StateKind = 'baseline' | 'stress' | 'fixture' | 'interactive' | 'swe
 export interface SettleResult {
   settled: boolean;
   reason: 'settled' | 'timeout';
+  // Wall-clock time the wait took (for timing reports only; nothing is decided from it).
   elapsedMs: number;
   fontsReady: boolean;
+  // Page time the page was given (its clock is paused between waits).
+  pageMs?: number;
 }
 
 export interface ScreenshotRecord {

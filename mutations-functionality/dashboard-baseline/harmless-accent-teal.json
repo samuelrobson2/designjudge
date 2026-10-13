@@ -1,0 +1,11 @@
+{
+  "css": ":root { --accent: #0f766e; --accent-soft: #e6f4f1; }",
+  "js": null,
+  "case": "dashboard-baseline",
+  "id": "harmless-accent-teal",
+  "kind": "harmless",
+  "title": "Accent colour changed to teal",
+  "symptom": "The accent colour and its tint change from orange to teal. Nothing about behaviour changes.",
+  "where": {},
+  "severity": "none"
+}

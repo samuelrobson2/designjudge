@@ -1,0 +1,20 @@
+{
+  "id": "carsearch-clean",
+  "title": "Used car search — revised",
+  "summary": "A separately revised version of the used car search page, built for the same request.",
+  "request": "Build a page to browse used cars for sale near the user, filter them by price, make, mileage and fuel type, sort the results, and compare listings to find a good deal.",
+  "source": {
+    "type": "static",
+    "dir": "site"
+  },
+  "entry": "/index.html",
+  "fixtures": {
+    "supported": [
+      "empty",
+      "typical",
+      "dense",
+      "expanded",
+      "stress"
+    ]
+  }
+}

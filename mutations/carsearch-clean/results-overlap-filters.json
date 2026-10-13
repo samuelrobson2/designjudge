@@ -1,0 +1,20 @@
+{
+  "id": "results-overlap-filters",
+  "case": "carsearch-clean",
+  "kind": "defect",
+  "title": "Results slide over the filter panel on desktop",
+  "symptom": "From 1024 px the results column is pulled 150 px to the left and painted on top of the filter panel, so the first column of cars covers the right half of the filters, hiding their counts and part of each option.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ],
+    "widths": [
+      1024,
+      1920
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": "@media (min-width: 1024px) {\n  .results { margin-left: -150px; position: relative; }\n}",
+  "js": null
+}

@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll(\"#h-revenue, .kpi__label, #h-products, #h-orders, .card__sub, .orders__table th, .status, .page-head__sub\").forEach((el) => { const to = {\"Revenue\":\"GMV (gross, pre-refund)\",\"Orders\":\"Txn count\",\"Average order value\":\"AOV (μ)\",\"Conversion rate\":\"CVR (sess→ord)\",\"Top products\":\"SKU perf.\",\"Ranked by revenue\":\"Sorted rev desc\",\"Recent orders\":\"Order log (n=8)\",\"Select an order to see its items.\":\"Click row → line items\",\"Order\":\"Ord#\",\"Customer\":\"Cust\",\"Date\":\"Ts\",\"Items\":\"Qty\",\"Total\":\"Amt\",\"Status\":\"Fulfil. stat\",\"To ship\":\"UNFUL\",\"Shipped\":\"FUL/IT\",\"Delivered\":\"FUL/DLV\",\"1–14 Sep, compared with 1–14 Aug\":\"MTD vs PMTD\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; });\ndocument.querySelectorAll('.product__meta').forEach((p) => { if (/ sold$/.test(p.textContent)) p.textContent = p.textContent.replace(/ sold$/, 'u'); }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "dashboard-clean",
+  "id": "jargon-labels",
+  "kind": "defect",
+  "title": "Metrics and columns labelled in analyst jargon",
+  "symptom": "Labels become internal abbreviations: \"GMV (gross, pre-refund)\", \"Txn count\", \"AOV (μ)\", \"CVR (sess→ord)\", \"SKU perf.\", \"Order log (n=8)\", columns \"Ord#\", \"Cust\", \"Ts\", \"Qty\", \"Amt\", \"Fulfil. stat\", statuses \"UNFUL\" and \"FUL/IT\", and the period line \"MTD vs PMTD\", so a store owner has to decode every figure.",
+  "where": {},
+  "severity": "severe"
+}

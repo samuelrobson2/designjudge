@@ -1,0 +1,11 @@
+{
+  "id": "flat-hierarchy",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Headings set like body text",
+  "symptom": "The page title and section headings are 15 px at weight 400, the same as body text, so the page has no visible hierarchy.",
+  "where": {},
+  "severity": "severe",
+  "css": ".page__intro h1, .form-section__head h2, .summary__card h2, .slot-group__title { font-size: 15px !important; font-weight: 400 !important; }",
+  "js": null
+}

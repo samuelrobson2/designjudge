@@ -1,0 +1,11 @@
+{
+  "css": ".basket { margin-left: auto; font-weight: 600; color: var(--primary); text-decoration: none; }\n.basket-btn { min-height: 36px; padding: 6px 14px; }",
+  "js": "const apply = () => { document.querySelectorAll('.car__foot').forEach((f) => { if (!f.querySelector('.basket-btn')) f.insertAdjacentHTML('beforeend', '<button type=\"button\" class=\"btn btn--primary basket-btn\">Add to basket</button>'); });\ndocument.querySelectorAll('.specs').forEach((s) => { if (!s.querySelector('.stock')) s.insertAdjacentHTML('beforeend', '<li class=\"stock\">In stock · Free delivery in 3–5 days</li>'); });\nconst inner = document.querySelector('.site-header__inner');\nif (inner && !inner.querySelector('.basket')) inner.insertAdjacentHTML('beforeend', '<a class=\"basket\" href=\"#basket\">Basket (0)</a>');\nconst h = document.getElementById('h-results');\nif (h && / cars? /.test(h.textContent)) h.textContent = h.textContent.replace(/ cars? /, (m) => (m === ' car ' ? ' product ' : ' products ')); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "carsearch-clean",
+  "id": "shop-basket-actions",
+  "kind": "defect",
+  "title": "Used cars sold like basket items",
+  "symptom": "Every car has an \"Add to basket\" button and an \"In stock · Free delivery in 3–5 days\" line, the header shows \"Basket (0)\" and the results heading counts \"products\": an online shop's vocabulary and actions, not those of buying a used car from a seller (viewing, contacting the seller, test drives).",
+  "where": {},
+  "severity": "moderate"
+}

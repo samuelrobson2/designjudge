@@ -1,0 +1,20 @@
+{
+  "css": null,
+  "js": "const d = document.createElement('div'); d.className = 'tour-anchor'; d.style.cssText = 'position:fixed;top:0;left:0;width:72px;height:72px;z-index:1000'; document.body.append(d);",
+  "case": "dashboard-baseline",
+  "id": "menu-button-blocked",
+  "kind": "defect",
+  "title": "Invisible layer blocks the menu button",
+  "symptom": "A transparent element left in the top-left corner sits over the menu (hamburger) button on phones and tablets, so taps on it never reach the button and the navigation cannot be opened.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ]
+  },
+  "severity": "severe"
+}

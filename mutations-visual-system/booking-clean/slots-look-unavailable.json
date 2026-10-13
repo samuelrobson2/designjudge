@@ -1,0 +1,11 @@
+{
+  "css": ".slot:nth-child(3n):not(.is-selected) { background: #f1f3f5; border-style: dashed; color: var(--muted); text-decoration: line-through; }",
+  "js": null,
+  "case": "booking-clean",
+  "id": "slots-look-unavailable",
+  "kind": "defect",
+  "title": "Every third time slot looks unavailable",
+  "symptom": "Every third time slot is drawn with a grey fill, a dashed border and its time struck through, the way unavailable options usually look, although it can be booked like the rest, so a third of the open times appear taken.",
+  "where": {},
+  "severity": "moderate"
+}

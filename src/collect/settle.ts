@@ -1,68 +1,109 @@
-import type { Page } from 'playwright';
-import { SETTLE } from '../config.ts';
+// The one wait every collector uses. A page's clock is paused (collect.ts preparePage), so a wait
+// gives the page a fixed amount of page time, then holds until it is quiet: no request open, and
+// nothing changing over a rendered frame with CSS animations settled (page/quiet.ts). What the page
+// shows afterwards is the same on a fast or a slow machine; wall-clock time only caps a page that
+// never goes quiet.
+
+import type { Page, Request } from 'playwright';
+import { PAGE_TIME, QUIESCE } from '../config.ts';
 import type { SettleResult } from '../types.ts';
+import { quietScript } from './pageScripts.ts';
+
+// Streams and media never finish loading.
+const UNTRACKED = new Set(['eventsource', 'websocket', 'media']);
 
 export class NetworkTracker {
   inflight = 0;
   lastActivity = Date.now();
   external = new Set<string>();
   failed: string[] = [];
+  private open = new Map<Request, number>();
 
   constructor(page: Page, origin: string) {
     page.on('request', (req) => {
-      this.inflight++;
       this.lastActivity = Date.now();
       const url = req.url();
-      if (!url.startsWith(origin) && !url.startsWith('data:') && !url.startsWith('blob:')) this.external.add(url);
+      if (origin && !url.startsWith(origin) && !url.startsWith('data:') && !url.startsWith('blob:')) this.external.add(url);
+      if (UNTRACKED.has(req.resourceType())) return;
+      this.open.set(req, Date.now());
+      this.inflight = this.open.size;
     });
-    const done = () => {
-      this.inflight = Math.max(0, this.inflight - 1);
+    const done = (req: Request) => {
+      this.open.delete(req);
+      this.inflight = this.open.size;
       this.lastActivity = Date.now();
     };
     page.on('requestfinished', done);
     page.on('requestfailed', (req) => {
-      done();
+      done(req);
       this.failed.push(`${req.url()} (${req.failure()?.errorText ?? 'failed'})`);
     });
   }
 
-  quietFor(ms: number): boolean {
-    return this.inflight === 0 && Date.now() - this.lastActivity >= ms;
+  // Requests still worth waiting for.
+  pending(): number {
+    const now = Date.now();
+    let n = 0;
+    for (const t of this.open.values()) if (now - t < QUIESCE.longRequestMs) n++;
+    return n;
   }
 }
+
+const trackers = new WeakMap<Page, NetworkTracker>();
+
+// Every request the page makes from now on is waited for by quiesce.
+export function watchNetwork(page: Page): void {
+  if (!trackers.has(page)) trackers.set(page, new NetworkTracker(page, ''));
+}
+
+export type Budget = 'load' | 'action' | 'brief';
+
+const BUDGET_MS: Record<Budget, number> = { load: PAGE_TIME.loadMs, action: PAGE_TIME.actionMs, brief: PAGE_TIME.briefMs };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function signature(page: Page): Promise<string> {
-  return (await page.evaluate('window.__djSignature ? window.__djSignature() : ""')) as string;
+const contextGone = (err: unknown) => /Execution context was destroyed|Cannot find context|navigat/i.test(String((err as Error)?.message ?? err));
+
+// Calls a function of page/quiet.ts, adding the script first where the page was opened without it.
+export async function quietCall<T>(page: Page, fn: '__djAdvance' | '__djQuiet' | '__djHitCheck', ...args: unknown[]): Promise<T> {
+  const expr = `window.${fn} ? (async () => ({ r: await window.${fn}(${args.map((a) => JSON.stringify(a)).join(', ')}) }))() : null`;
+  const out = (await page.evaluate(expr)) as { r: T } | null;
+  if (out) return out.r;
+  await page.evaluate(await quietScript());
+  return ((await page.evaluate(expr)) as { r: T }).r;
 }
 
-// Shared render-settled signal: load, fonts ready, network quiet, layout quiet; capped.
-export async function waitForSettled(page: Page, tracker: NetworkTracker | null, lite = false): Promise<SettleResult> {
+// Gives the page `budget` of page time, then waits until it is quiet.
+export async function quiesce(page: Page, budget: Budget | number = 'action'): Promise<SettleResult> {
+  const budgetMs = typeof budget === 'number' ? budget : BUDGET_MS[budget];
   const start = Date.now();
-  const maxMs = lite ? SETTLE.liteMaxMs : SETTLE.maxMs;
-  const layoutQuietMs = lite ? SETTLE.liteLayoutQuietMs : SETTLE.layoutQuietMs;
+  const deadline = start + QUIESCE.capMs;
+  const net = trackers.get(page);
+  let spent = 0;
+  let clock = true;
   let fontsReady = false;
-  try {
-    if (!lite) await page.waitForLoadState('load', { timeout: maxMs });
-    fontsReady = (await page.evaluate('document.fonts.ready.then(() => true)')) as boolean;
-  } catch {
-    // Fall through to the polling loop; the timeout is reported.
-  }
-  let last = await signature(page);
-  let stableSince = Date.now();
-  while (Date.now() - start < maxMs) {
-    await sleep(SETTLE.pollMs);
-    const sig = await signature(page);
-    if (sig !== last) {
-      last = sig;
-      stableSince = Date.now();
+  while (Date.now() < deadline) {
+    try {
+      while (net && net.pending() > 0 && Date.now() < deadline) await sleep(5);
+      if (clock && spent < budgetMs) {
+        const r = await quietCall<{ clock: boolean; advanced: number; blocked: boolean }>(page, '__djAdvance', budgetMs - spent);
+        spent += r.advanced;
+        if (!r.clock) clock = false;
+        if (r.blocked) {
+          await sleep(5);
+          continue;
+        }
+      }
+      const q = await quietCall<{ quiet: boolean; fonts: boolean }>(page, '__djQuiet');
+      fontsReady = q.fonts;
+      if (q.quiet && (!net || net.pending() === 0) && (spent >= budgetMs || !clock)) {
+        return { settled: true, reason: 'settled', elapsedMs: Date.now() - start, fontsReady, pageMs: spent };
+      }
+    } catch (err) {
+      if (!contextGone(err)) throw err;
+      // The page navigated; the new document starts with its clock paused again.
+      await page.waitForLoadState('load', { timeout: Math.max(1, deadline - Date.now()) }).catch(() => {});
     }
-    const layoutQuiet = Date.now() - stableSince >= layoutQuietMs;
-    const networkQuiet = tracker ? tracker.quietFor(lite ? 0 : SETTLE.networkQuietMs) : true;
-    if (layoutQuiet && networkQuiet) {
-      return { settled: true, reason: 'settled', elapsedMs: Date.now() - start, fontsReady };
-    }
   }
-  return { settled: false, reason: 'timeout', elapsedMs: Date.now() - start, fontsReady };
+  return { settled: false, reason: 'timeout', elapsedMs: Date.now() - start, fontsReady, pageMs: spent };
 }

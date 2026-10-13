@@ -1,0 +1,11 @@
+{
+  "description": "First Task Fit prompt: Typography v1's structure (fixed system prompt, the criteria in order) without any evidence blocks; the judge works from the request and screenshots of the desktop, phone and interactive states.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5"
+}

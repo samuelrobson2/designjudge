@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview · Oak &amp; Ember</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="shell"></div>
+    <script type="module" src="app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('click', (e) => {
+          const el = e.target.closest && e.target.closest("[data-range]");
+          if (!el) return;
+          e.stopPropagation();
+        }, true);
+        const apply = () => { [document.querySelectorAll('tr.order-row'), document.querySelectorAll('.order-card[data-order]')].forEach((list) => {
+          const rows = [...list];
+          rows.forEach((el, i) => {
+            if (el.dataset.djShifted) return;
+            const next = String((i + 1) % rows.length);
+            el.dataset.djShifted = '1';
+            el.dataset.order = next;
+          });
+        }); };
+        const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+        apply();
+        mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        document.addEventListener('click', (e) => {
+          const el = e.target.closest && e.target.closest("[data-action=\"close-order\"]");
+          if (!el) return;
+          e.stopPropagation();
+        }, true);
+      }, { once: true });
+    </script>
+  </body>
+</html>

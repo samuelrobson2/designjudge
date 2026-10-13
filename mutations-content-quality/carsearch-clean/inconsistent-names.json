@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { const names = ['Compare', 'Shortlist', 'Add to comparison', 'Watch'];\ndocument.querySelectorAll('.compare-check > span').forEach((s, i) => { const to = names[i % names.length]; if (s.textContent !== to) s.textContent = to; });\nconst h = document.getElementById('h-results');\nif (h && / cars? /.test(h.textContent)) h.textContent = h.textContent.replace(/ cars? /, (m) => (m === ' car ' ? ' vehicle ' : ' vehicles '));\ndocument.querySelectorAll(\"#fg-make, #fg-mileage, .results__note\").forEach((el) => { const to = {\"Make\":\"Brand\",\"Mileage\":\"Odometer\",\"Price ratings compare each car with the average price of the same model, age and mileage.\":\"Deal scores compare each motor with the average price of the same model, age and mileage.\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; });\ndocument.querySelectorAll('.filters__foot .btn').forEach((b) => { if (/ cars?$/.test(b.textContent)) b.textContent = b.textContent.replace(/ cars?$/, (m) => (m === ' car' ? ' listing' : ' listings')); }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "carsearch-clean",
+  "id": "inconsistent-names",
+  "kind": "defect",
+  "title": "Same things called by different names",
+  "symptom": "The Compare checkbox is labelled \"Compare\", \"Shortlist\", \"Add to comparison\" or \"Watch\" from card to card; the results count \"vehicles\", the filter drawer shows \"listings\", the note calls ratings \"deal scores\" for each \"motor\", and the filters say \"Brand\" and \"Odometer\" where the cards say make names and miles.",
+  "where": {},
+  "severity": "moderate"
+}

@@ -1,4 +1,4 @@
-import type { DiagnosticItem, ElementRecord, Rect, ShiftEntry, Snapshot } from '../../types.ts';
+import type { DiagnosticItem, ElementRecord, PictureRecord, Rect, ShiftEntry, Snapshot } from '../../types.ts';
 import { median, round1, round2 } from '../../util.ts';
 import { Doc, MEDIA_TAGS, SEMANTIC_TAGS, LANDMARK_ROLES, TABLE_PART_TAGS, area, bottom, intersect, isInlineDisplay, right } from '../doc.ts';
 
@@ -428,6 +428,141 @@ export function alignmentOutliers(doc: Doc): ObservationOutput {
   };
 }
 
+// ---------- Media Cropping and Distortion ----------
+
+// Smaller pictures are icons and marks, where the fit does not show.
+const MIN_PICTURE_AREA = 48 * 48;
+
+export interface PictureFit {
+  // Size the picture is drawn at, in CSS px.
+  drawn: [number, number];
+  // Share of the picture's area inside its box, and the share of its width or height cut off at each edge.
+  shown: number;
+  cut: { top: number; right: number; bottom: number; left: number };
+  // Drawn aspect ratio ÷ natural aspect ratio − 1: positive when stretched wider, negative when squeezed narrower.
+  distortion: number;
+}
+
+function drawnSize(p: PictureRecord): [number, number] | null {
+  const [nw, nh] = p.natural;
+  const [bw, bh] = p.box;
+  const scaled = (s: number): [number, number] => [nw * s, nh * s];
+  if (p.source === 'background') {
+    if (p.fit === 'cover') return scaled(Math.max(bw / nw, bh / nh));
+    if (p.fit === 'contain') return scaled(Math.min(bw / nw, bh / nh));
+    // Percentages fit the image to its box; px sizes and the natural size (sprites, textures) do not.
+    const [a, b = 'auto'] = p.fit.split(/\s+/);
+    const size = (t: string, ref: number) => (t === 'auto' ? null : /^[\d.]+%$/.test(t) ? (parseFloat(t) / 100) * ref : NaN);
+    const w = size(a, bw);
+    const h = size(b, bh);
+    if (Number.isNaN(w) || Number.isNaN(h) || (w === null && h === null)) return null;
+    return [w ?? (h! * nw) / nh, h ?? (w! * nh) / nw];
+  }
+  if (p.fit === 'fill') return [bw, bh];
+  if (p.fit === 'contain') return scaled(Math.min(bw / nw, bh / nh));
+  if (p.fit === 'cover') return scaled(Math.max(bw / nw, bh / nh));
+  if (p.fit === 'none') return [nw, nh];
+  if (p.fit === 'scale-down') return scaled(Math.min(1, bw / nw, bh / nh));
+  return null;
+}
+
+// Offset of the drawn picture from the box's start edge, from a position such as "50%", "12px" or "left".
+function offsetOf(pos: string, free: number): number {
+  if (/^-?[\d.]+%$/.test(pos)) return (free * parseFloat(pos)) / 100;
+  if (/^-?[\d.]+px$/.test(pos)) return parseFloat(pos);
+  if (pos === 'left' || pos === 'top') return 0;
+  if (pos === 'right' || pos === 'bottom') return free;
+  return free / 2;
+}
+
+export function pictureFit(p: PictureRecord): PictureFit | null {
+  const [nw, nh] = p.natural;
+  const [bw, bh] = p.box;
+  if (!(nw > 0 && nh > 0 && bw > 0 && bh > 0)) return null;
+  const drawn = drawnSize(p);
+  if (!drawn || !(drawn[0] > 0 && drawn[1] > 0)) return null;
+  // A repeating background smaller than its box tiles; it is a pattern, not one picture.
+  if (p.repeat && ((p.repeat[0] && drawn[0] < bw - 1) || (p.repeat[1] && drawn[1] < bh - 1))) return null;
+  const axis = (box: number, size: number, pos: string) => {
+    const at = offsetOf(pos, box - size);
+    const start = Math.max(0, -at) / size;
+    const end = Math.max(0, at + size - box) / size;
+    return { start: Math.min(1, start), end: Math.min(1, end), shown: Math.max(0, 1 - start - end) };
+  };
+  const x = axis(bw, drawn[0], p.position[0]);
+  const y = axis(bh, drawn[1], p.position[1]);
+  return {
+    drawn: [round1(drawn[0]), round1(drawn[1])],
+    shown: round2(x.shown * y.shown),
+    cut: { top: round2(y.start), right: round2(x.end), bottom: round2(y.end), left: round2(x.start) },
+    distortion: round2(drawn[0] / drawn[1] / (nw / nh) - 1) || 0,
+  };
+}
+
+function fitWords(p: PictureRecord): string {
+  if (p.source === 'background') return `background-size: ${p.fit}`;
+  if (p.source === 'svg') return `preserveAspectRatio ${p.fit === 'cover' ? 'slice' : 'meet'}`;
+  return `object-fit: ${p.fit}`;
+}
+
+// How much of each picture is visible in its box and whether it keeps its natural aspect ratio.
+export function mediaFit(doc: Doc): ObservationOutput {
+  const measured: { el: ElementRecord; p: PictureRecord; fit: PictureFit }[] = [];
+  let stretchedDrawings = 0;
+  for (const p of doc.snap.pictures ?? []) {
+    const el = doc.get(p.id);
+    if (!el || !el.visible || el.visuallyHidden || el.closedDetails || p.box[0] * p.box[1] < MIN_PICTURE_AREA) continue;
+    // preserveAspectRatio="none" stretches a drawing on purpose (charts, sparklines, dividers).
+    if (p.source === 'svg' && p.fit === 'fill') {
+      stretchedDrawings++;
+      continue;
+    }
+    const fit = pictureFit(p);
+    if (fit) measured.push({ el, p, fit });
+  }
+  const leftOut = stretchedDrawings
+    ? ` ${stretchedDrawings} SVG drawing${stretchedDrawings > 1 ? 's' : ''} stretched on purpose (preserveAspectRatio="none") ${stretchedDrawings > 1 ? 'were' : 'was'} left out.`
+    : '';
+  measured.sort((a, b) => a.fit.shown - b.fit.shown || Math.abs(b.fit.distortion) - Math.abs(a.fit.distortion));
+  const pct = (n: number) => `${r0(n * 100)}%`;
+  const items = measured.map(({ el, p, fit }, i) => {
+    const naturalAspect = p.natural[0] / p.natural[1];
+    const boxAspect = p.box[0] / p.box[1];
+    return item(
+      i + 1,
+      `${doc.describe(el)}: ${pct(fit.shown)} of the ${p.source === 'background' ? 'background image' : p.source} visible in its ${r0(p.box[0])}×${r0(p.box[1])} px box (${fitWords(p)}; picture aspect ratio ${round2(naturalAspect)}, box ${round2(boxAspect)})${
+        fit.distortion ? `, drawn ${fit.distortion > 0 ? 'wider' : 'narrower'} than its natural aspect ratio by ${pct(Math.abs(fit.distortion))}` : ''
+      }${p.decorative ? '; decorative' : ''}`,
+      [el],
+      doc,
+      {
+        source: p.source,
+        fit: p.fit,
+        decorative: p.decorative,
+        box: p.box,
+        naturalAspect: round2(naturalAspect),
+        boxAspect: round2(boxAspect),
+        drawnAspect: round2(fit.drawn[0] / fit.drawn[1]),
+        shown: fit.shown,
+        cut: fit.cut,
+        distortion: fit.distortion,
+      },
+    );
+  });
+  const leastShown = measured.find((m) => !m.p.decorative);
+  const mostDistorted = [...measured].sort((a, b) => Math.abs(b.fit.distortion) - Math.abs(a.fit.distortion))[0];
+  return {
+    status: 'observed',
+    evaluated: measured.length,
+    summary: measured.length
+      ? `${measured.length} picture${measured.length > 1 ? 's' : ''} of at least 48 × 48 px measured.` +
+        (leastShown ? ` Least of a content picture visible: ${pct(leastShown.fit.shown)} (${doc.describe(leastShown.el)}).` : '') +
+        ` Largest distortion: ${pct(Math.abs(mostDistorted.fit.distortion))}${mostDistorted.fit.distortion ? ` (${doc.describe(mostDistorted.el)})` : ''}.${leftOut}`
+      : `No pictures of at least 48 × 48 px to measure.${leftOut}`,
+    items,
+  };
+}
+
 // ---------- Runtime Layout Stability ----------
 
 export function layoutStability(shifts: ShiftEntry[] | undefined): ObservationOutput & { elementsless: true } {
@@ -491,14 +626,30 @@ function structure(p: ElementRecord | undefined): string {
   return p.display;
 }
 
+// Without component labels, elements are matched across widths by their path in the page, with
+// repeats of one path told apart by order. Element IDs would not do: pages that re-render on
+// resize create new elements, and new IDs, at each width.
+function pathKeys(doc: Doc): Map<ElementRecord, string> {
+  const seen = new Map<string, number>();
+  const keys = new Map<ElementRecord, string>();
+  for (const el of doc.els) {
+    const n = seen.get(el.selector) ?? 0;
+    seen.set(el.selector, n + 1);
+    keys.set(el, `e:${el.selector}#${n}`);
+  }
+  return keys;
+}
+
 export function responsiveAdaptation(snaps: { width: number; snap: Snapshot }[]): ObservationOutput & { transitions: { width: number; reason: string }[] } {
   const docs = snaps.map((s) => ({ width: s.width, doc: new Doc(s.snap), vpArea: s.snap.viewport.width * s.snap.viewport.height }));
   const annotated = docs.some((d) => d.doc.els.some((e) => e.componentId !== null));
+  const keysByDoc = new Map(docs.map((d) => [d.doc, annotated ? null : pathKeys(d.doc)]));
   const series = new Map<string, Sample[]>();
   for (const { width, doc, vpArea } of docs) {
+    const keys = keysByDoc.get(doc);
     for (const el of doc.els) {
       if (!isTracked(doc, el, vpArea, annotated)) continue;
-      const key = annotated ? `c:${el.componentId}` : `e:${el.id}`;
+      const key = keys ? keys.get(el)! : `c:${el.componentId}`;
       series.set(key, [...(series.get(key) ?? []), { width, el, parent: doc.parent(el) }]);
     }
   }
@@ -585,6 +736,7 @@ export function responsiveAdaptation(snaps: { width: number; snap: Snapshot }[])
   let peerAvailable = false;
   const peerAgg = new Map<string, { label: string; type: string; maxDev: number; dw: number; dh: number; da: number; at: number; widths: number[] }>();
   for (const { width, doc } of docs) {
+    const keys = keysByDoc.get(doc);
     const byType = new Map<string, ElementRecord[]>();
     for (const el of doc.els) if (el.componentType && el.visible && el.rect.w > 0) byType.set(el.componentType, [...(byType.get(el.componentType) ?? []), el]);
     for (const [t, list] of byType) {
@@ -599,7 +751,7 @@ export function responsiveAdaptation(snaps: { width: number; snap: Snapshot }[])
         const da = (el.rect.w / Math.max(1, el.rect.h) - ma) / ma;
         const dev = Math.max(Math.abs(dw), Math.abs(dh), Math.abs(da));
         if (dev <= 0.25) continue;
-        const key = annotated ? `c:${el.componentId ?? el.selector}` : `e:${el.id}`;
+        const key = keys ? keys.get(el)! : `c:${el.componentId ?? el.selector}`;
         const prev = peerAgg.get(key) ?? { label: el.componentId ? `[${el.componentId}]` : el.selector, type: t, maxDev: 0, dw: 0, dh: 0, da: 0, at: width, widths: [] };
         prev.widths.push(width);
         if (dev > prev.maxDev) Object.assign(prev, { maxDev: dev, dw, dh, da, at: width });
@@ -622,7 +774,7 @@ export function responsiveAdaptation(snaps: { width: number; snap: Snapshot }[])
     status: 'observed',
     evaluated: series.size,
     summary:
-      `${series.size} components tracked across ${docs.length} widths (${annotated ? 'matched by data-component-id' : 'matched by harness identity during an in-place resize'}). ` +
+      `${series.size} components tracked across ${docs.length} widths (${annotated ? 'matched by data-component-id' : 'matched by element path'}). ` +
       `${structuralItems.length} layout-structure transitions.` +
       (sizeItems[0] ? ` Largest size change: ${sizeItems[0].summary}.` : '') +
       (peerAvailable ? ` ${peerItems.length} labelled components deviate more than 25% from their peer median at some width.` : ' Peer comparison unavailable: no data-component-type labels.'),

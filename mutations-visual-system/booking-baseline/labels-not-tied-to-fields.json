@@ -1,0 +1,11 @@
+{
+  "css": ".field .field__label { font-size: 14px; font-weight: 560; }",
+  "js": "const apply = () => { document.querySelectorAll('.field label').forEach((l) => {\n  const s = document.createElement('span');\n  s.className = 'field__label';\n  s.innerHTML = l.innerHTML;\n  l.replaceWith(s);\n}); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true });",
+  "case": "booking-baseline",
+  "id": "labels-not-tied-to-fields",
+  "kind": "defect",
+  "title": "Field labels no longer tied to their fields",
+  "symptom": "The text above \"Full name\", \"Email\", \"Phone\" and \"Anything we should know?\" looks the same but is plain text rather than a label, so the fields have no accessible name: a screen reader announces each as an unnamed edit field, and clicking the text no longer focuses the field.",
+  "where": {},
+  "severity": "moderate"
+}

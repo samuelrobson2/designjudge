@@ -1,0 +1,21 @@
+{
+  "id": "orders-table-clipped-narrow",
+  "case": "dashboard-clean",
+  "kind": "defect",
+  "title": "Orders table cut off on tablets and phones",
+  "symptom": "Below 1024 px the orders table keeps a 760 px width inside a card that clips it, so on a tablet the Status column is cut off and on a phone the Total and Status columns are hidden.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 1023px) {\n  .orders { overflow: hidden; }\n  .orders__table { width: 760px; }\n}",
+  "js": null
+}

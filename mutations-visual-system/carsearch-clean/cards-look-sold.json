@@ -1,0 +1,11 @@
+{
+  "css": ".car:nth-child(3n) { background: #eef0f3; border: 1px dashed #9aa3b0; border-radius: 3px; }",
+  "js": null,
+  "case": "carsearch-clean",
+  "id": "cards-look-sold",
+  "kind": "defect",
+  "title": "Every third car card looks greyed out",
+  "symptom": "Every third car card gets a grey fill, a dashed grey border and tight corners, the way sold or unavailable listings usually look, while the others stay white with rounded corners, so a third of the results appear not for sale.",
+  "where": {},
+  "severity": "moderate"
+}

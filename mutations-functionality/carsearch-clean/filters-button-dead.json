@@ -1,0 +1,20 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-action=\\\"open-filters\\\"]\");\n  if (!el) return;\n  e.stopPropagation();\n}, true);",
+  "case": "carsearch-clean",
+  "id": "filters-button-dead",
+  "kind": "defect",
+  "title": "Filters button does nothing on phones",
+  "symptom": "On phones and tablets the \"Filters\" button no longer opens the filter drawer, so the results cannot be narrowed by price, make, mileage or fuel at all.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ]
+  },
+  "severity": "severe"
+}

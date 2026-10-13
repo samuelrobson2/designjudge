@@ -1,0 +1,11 @@
+{
+  "css": ".kpi:nth-child(2) { background: #1b1d21; border-color: transparent; border-radius: 24px; box-shadow: 0 10px 24px rgba(16, 24, 40, 0.28); } .kpi:nth-child(2) .kpi__label, .kpi:nth-child(2) .kpi__value { color: #f5f5f2; }",
+  "js": null,
+  "case": "dashboard-clean",
+  "id": "minor-odd-kpi-card-inverted",
+  "kind": "defect",
+  "title": "One metric card inverted to a dark fill",
+  "symptom": "The \"Average order value\" card is drawn as a dark, borderless, shadowed tile with pill-like corners while the other metric cards stay light and bordered, so it reads as an alert or the most important figure although it is an ordinary metric.",
+  "where": {},
+  "severity": "minor"
+}

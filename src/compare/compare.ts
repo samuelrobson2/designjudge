@@ -1,30 +1,68 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ARTIFACTS_DIR, BENCHMARK_DIR } from '../config.ts';
-import { LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
-import { loadOrBuildPacket } from '../categories/index.ts';
+import { categoryOf, loadOrBuildPacket } from '../categories/index.ts';
 import type { JudgmentRecord, RunRecord } from '../judge/record.ts';
 import { CHECK_HEADER, SUMMARY_HEADER, checkRows, citations, csv, summaryRow } from '../report/csv.ts';
 import { loadBundle, loadDiagnostics, runDir } from '../store.ts';
 import { log, readJson, round2, timestampId, writeJson } from '../util.ts';
 
-export interface CaseExpectation {
-  role: 'baseline' | 'variant' | 'standalone';
-  baseline?: string;
+export type Expected = 'must_drop' | 'may_drop' | 'no_rise' | 'no_change' | 'may_rise' | 'must_rise';
+
+// How a variant should score against one baseline. An interface can be the variant of several pairs.
+export interface PairExpectation {
+  baseline: string;
+  variant: string;
   change?: string;
-  expected?: 'must_drop' | 'may_drop' | 'no_change' | 'must_rise';
+  expected?: Expected;
   criteria?: string[];
   targets?: { checks?: { diagId: string; stateId?: string }[] };
 }
 
-export function loadExpectations(): Record<string, CaseExpectation> {
-  const file = path.join(BENCHMARK_DIR, 'expectations.json');
-  if (!fs.existsSync(file)) return {};
-  return readJson<{ cases: Record<string, CaseExpectation> }>(file).cases ?? {};
+export interface CategoryExpectations {
+  pairs: PairExpectation[];
+  // Interfaces built to have no material weakness in this category.
+  no_material_weakness?: string[];
+  // Why an interface is not compared with another in this category.
+  notes?: Record<string, string>;
 }
 
-export function loadRun(runId: string): { run: RunRecord; judgments: JudgmentRecord[] } {
-  const dir = runDir(runId);
+// One category's expected outcomes, or null when the category has none.
+export function loadExpectations(category: string): CategoryExpectations | null {
+  const file = path.join(BENCHMARK_DIR, 'expectations.json');
+  if (!fs.existsSync(file)) return null;
+  const set = readJson<{ categories?: Record<string, CategoryExpectations> }>(file).categories?.[category];
+  return set ? { ...set, pairs: set.pairs ?? [] } : null;
+}
+
+export function roleOf(expectations: CategoryExpectations | null, caseId: string): 'baseline' | 'variant' | 'standalone' {
+  const pairs = expectations?.pairs ?? [];
+  if (pairs.some((p) => p.variant === caseId)) return 'variant';
+  return pairs.some((p) => p.baseline === caseId) ? 'baseline' : 'standalone';
+}
+
+// What each expected outcome requires of the variant against its baseline: the difference in
+// mean score, and the share of baseline × variant score pairs where the variant is not higher.
+const MEETS: Record<Expected, (delta: number, pNotHigher: number) => boolean> = {
+  must_drop: (delta, pNotHigher) => delta < 0 && pNotHigher >= 0.8,
+  may_drop: (delta) => delta <= 0,
+  // A material weakness moves a score by a whole anchor, so means within half a point are one score.
+  no_rise: (delta) => delta <= 0.5,
+  no_change: (delta) => Math.abs(delta) < 0.5,
+  may_rise: (delta) => delta >= 0,
+  must_rise: (delta, pNotHigher) => delta > 0 && 1 - pNotHigher >= 0.8,
+};
+
+// With fewer valid scores than this on either side, one judgment noticing a material weakness that
+// another misses (a point in most categories, two in Content Quality) can make a pair look
+// contrary, so such a pair needs more repeats rather than failing. From three, one judgment a
+// point off moves a mean by at most a third.
+const MIN_REPEATS = 3;
+
+// Every rubric's 4 is "Strong: no material weakness"; a mean within half a point of it counts as 4.
+const NO_MATERIAL_WEAKNESS_MIN = 3.5;
+
+export function loadRun(runId: string, dir = runDir(runId)): { run: RunRecord; judgments: JudgmentRecord[] } {
   const run = readJson<RunRecord>(path.join(dir, 'run.json'));
   const judgments: JudgmentRecord[] = [];
   const jdir = path.join(dir, 'judgments');
@@ -52,12 +90,17 @@ function stats(values: number[]) {
 
 function weaknesses(j: JudgmentRecord) {
   if (!j.output) return [];
-  return LAYOUT_CRITERIA.flatMap((c) => j.output!.criteria[c.id].findings.filter((f) => f.polarity !== 'strength').map((f) => ({ ...f, criterion: c.id })));
+  return categoryOf(j.category ?? 'layout').criteria.flatMap((c) => j.output!.criteria[c.id].findings.filter((f) => f.polarity !== 'strength').map((f) => ({ ...f, criterion: c.id })));
 }
 
 export function summariseRun(runId: string) {
   const { run, judgments } = loadRun(runId);
-  const expectations = loadExpectations();
+  return summarise(run, judgments, loadExpectations(run.category ?? 'layout'));
+}
+
+// A run's judgments against its own category's expectations (null: the category has none).
+export function summarise(run: RunRecord, judgments: JudgmentRecord[], expectations: CategoryExpectations | null) {
+  const runId = run.runId;
   const byCase = new Map<string, JudgmentRecord[]>();
   for (const j of judgments) byCase.set(j.caseId, [...(byCase.get(j.caseId) ?? []), j]);
 
@@ -66,11 +109,11 @@ export function summariseRun(runId: string) {
     const valid = scores.filter((s): s is number => s !== null);
     const refs = js.reduce((s, j) => s + (j.validation?.stats.refs ?? 0), 0);
     const validRefs = js.reduce((s, j) => s + (j.validation?.stats.validRefs ?? 0), 0);
-    const exp = expectations[caseId];
+    const baselines = (expectations?.pairs ?? []).filter((p) => p.variant === caseId).map((p) => p.baseline);
     return {
       caseId,
-      role: exp?.role ?? 'standalone',
-      baseline: exp?.baseline ?? null,
+      role: roleOf(expectations, caseId),
+      baseline: baselines.length ? baselines.join(', ') : null,
       scores,
       ...stats(valid),
       invalid: js.filter((j) => j.status === 'invalid_output').length,
@@ -90,11 +133,11 @@ export function summariseRun(runId: string) {
     };
   });
 
+  // In the run's order of variants, then the file's order of each variant's baselines.
   const pairs = cases
-    .filter((c) => c.role === 'variant' && c.baseline && byCase.has(c.baseline))
-    .map((v) => {
-      const b = cases.find((c) => c.caseId === v.baseline)!;
-      const exp = expectations[v.caseId];
+    .flatMap((v) => (expectations?.pairs ?? []).filter((p) => p.variant === v.caseId && byCase.has(p.baseline)).map((exp) => ({ v, exp })))
+    .map(({ v, exp }) => {
+      const b = cases.find((c) => c.caseId === exp.baseline)!;
       const bs = b.scores.filter((s): s is number => s !== null);
       const vs = v.scores.filter((s): s is number => s !== null);
       let lower = 0;
@@ -109,15 +152,14 @@ export function summariseRun(runId: string) {
       const delta = v.mean !== null && b.mean !== null ? round2(v.mean - b.mean) : null;
       const pLower = total ? round2(lower / total) : null;
       const pNotHigher = total ? round2(notHigher / total) : null;
-      let verdict: 'as_expected' | 'not_as_expected' | 'insufficient' = 'insufficient';
-      if (delta !== null && pNotHigher !== null && pLower !== null) {
-        if (exp?.expected === 'must_drop') verdict = delta < 0 && pNotHigher >= 0.8 ? 'as_expected' : 'not_as_expected';
-        else if (exp?.expected === 'may_drop') verdict = delta <= 0 ? 'as_expected' : 'not_as_expected';
-        else if (exp?.expected === 'no_change') verdict = Math.abs(delta) < 0.5 ? 'as_expected' : 'not_as_expected';
-        else if (exp?.expected === 'must_rise') verdict = delta > 0 && 1 - pNotHigher >= 0.8 ? 'as_expected' : 'not_as_expected';
+      const meets = exp.expected ? MEETS[exp.expected] : undefined;
+      let verdict: 'as_expected' | 'not_as_expected' | 'needs_more_repeats' | 'insufficient' = 'insufficient';
+      if (meets && delta !== null && pNotHigher !== null) {
+        if (meets(delta, pNotHigher)) verdict = 'as_expected';
+        else verdict = Math.min(bs.length, vs.length) < MIN_REPEATS ? 'needs_more_repeats' : 'not_as_expected';
       }
       // Automated detection: a weakness cites the planted defect's target check, or falls in a target criterion.
-      const targetChecks = exp?.targets?.checks ?? [];
+      const targetChecks = exp.targets?.checks ?? [];
       const variantJudgments = byCase.get(v.caseId) ?? [];
       const cited = variantJudgments.filter((j) =>
         weaknesses(j).some((f) =>
@@ -127,14 +169,14 @@ export function summariseRun(runId: string) {
         ),
       ).length;
       const criterionHit = variantJudgments.filter((j) =>
-        weaknesses(j).some((f) => f.materiality === 'material' && (exp?.criteria ?? []).includes(f.criterion)),
+        weaknesses(j).some((f) => f.materiality === 'material' && (exp.criteria ?? []).includes(f.criterion)),
       ).length;
       return {
         baseline: b.caseId,
         variant: v.caseId,
-        change: exp?.change ?? '',
-        expected: exp?.expected ?? null,
-        targetCriteria: exp?.criteria ?? [],
+        change: exp.change ?? '',
+        expected: exp.expected ?? null,
+        targetCriteria: exp.criteria ?? [],
         baselineMean: b.mean,
         variantMean: v.mean,
         delta,
@@ -150,19 +192,31 @@ export function summariseRun(runId: string) {
       };
     });
 
+  // 5 needs material strengths, so a listed interface is not expected to reach it.
+  const noMaterialWeakness = (expectations?.no_material_weakness ?? [])
+    .map((id) => cases.find((c) => c.caseId === id))
+    .filter((c) => c !== undefined)
+    .map((c) => {
+      let verdict: 'as_expected' | 'not_as_expected' | 'needs_more_repeats' | 'insufficient' = 'insufficient';
+      if (c.mean !== null) verdict = c.mean >= NO_MATERIAL_WEAKNESS_MIN ? 'as_expected' : c.n < MIN_REPEATS ? 'needs_more_repeats' : 'not_as_expected';
+      return { caseId: c.caseId, minMean: NO_MATERIAL_WEAKNESS_MIN, mean: c.mean, n: c.n, verdict };
+    });
+
   return {
     runId,
     generatedAt: new Date().toISOString(),
-    run: { provider: run.provider, model: run.model, effort: run.effort, promptVersion: run.promptVersion, promptHash: run.promptHash, repeats: run.repeats, label: run.label ?? null },
+    run: { category: run.category, provider: run.provider, model: run.model, effort: run.effort, promptVersion: run.promptVersion, promptHash: run.promptHash, repeats: run.repeats, label: run.label ?? null },
     totals: run.totals ?? null,
     cases,
+    hasExpectations: expectations !== null,
     pairs,
+    noMaterialWeakness,
   };
 }
 
 function writeCsvs(runId: string) {
   const { run, judgments } = loadRun(runId);
-  const expectations = loadExpectations();
+  const expectations = loadExpectations(run.category ?? 'layout');
   const dir = runDir(runId);
   const summaryRows: (string | number | null | undefined)[][] = [SUMMARY_HEADER];
   const checkRowsOut: (string | number | null | undefined)[][] = [CHECK_HEADER];
@@ -173,17 +227,18 @@ function writeCsvs(runId: string) {
     const bundle = loadBundle(c.caseId, c.bundleId);
     const diags = loadDiagnostics(bundle);
     if (!diags) continue;
-    const packet = loadOrBuildPacket(bundle, run.promptVersion);
+    const packet = loadOrBuildPacket(bundle, run.promptVersion, run.category);
     const js = judgments.filter((j) => j.caseId === c.caseId);
-    const role = expectations[c.caseId]?.role ?? 'standalone';
+    const role = roleOf(expectations, c.caseId);
     for (const j of js) summaryRows.push(summaryRow(bundle, diags, { runId, role, packet, judgment: j, run }));
     checkRowsOut.push(...checkRows(bundle, diags, { runId, packet, cited: citations(js, diags), judgments: js.length }));
   }
   // Every evaluation-point assessment, one row each.
+  const criteria = categoryOf(run.category ?? 'layout').criteria;
   const pointRows: (string | number | null)[][] = [['run_id', 'case_id', 'repeat', 'criterion', 'evaluation_point', 'point_name', 'applicable', 'assessment', 'human_agrees', 'human_notes']];
   for (const j of judgments) {
     if (!j.output) continue;
-    for (const c of LAYOUT_CRITERIA) {
+    for (const c of criteria) {
       for (const p of c.points) {
         const e = j.output.criteria[c.id]?.evaluation_points[p.key];
         pointRows.push([runId, j.caseId, j.repeat, c.id, p.key, p.name, e ? (e.applicable ? 'yes' : 'no') : '', e?.assessment ?? '', '', '']);
@@ -193,7 +248,7 @@ function writeCsvs(runId: string) {
   for (const j of judgments) {
     if (!j.output) continue;
     const decisive = new Set(j.output.overall.decisive_finding_ids ?? []);
-    for (const c of LAYOUT_CRITERIA) {
+    for (const c of criteria) {
       for (const f of j.output.criteria[c.id].findings) {
         const issues = (j.validation?.refIssues ?? []).filter((i) => i.findingId === f.id).map((i) => `${i.problem}${i.ref ? `:${i.ref}` : ''}`);
         findingRows.push([
@@ -225,9 +280,11 @@ export function compareRuns(runIds: string[]) {
         `${c.caseId.padEnd(30)}${c.scores.map((s) => s ?? '×').join(' ').padEnd(17)}${String(c.mean ?? '—').padEnd(7)}${String(c.sd ?? '—').padEnd(5)}${String(c.modeShare ?? '—').padEnd(12)}${String(c.refValidity ?? '—').padEnd(11)}$${c.costUsd.toFixed(3)}`,
       );
     }
+    if (!r.hasExpectations) log(`no expectations for this category (${r.run.category ?? 'layout'})`);
     for (const p of r.pairs) {
       log(`pair ${p.baseline} → ${p.variant}: Δ ${p.delta} (expected ${p.expected}), P(variant<baseline) ${p.pLower}, verdict ${p.verdict}; target check cited in ${p.detection.citedTargetCheck ?? 'n/a'}/${p.detection.repeats} repeats`);
     }
+    for (const t of r.noMaterialWeakness) log(`no material weakness ${t.caseId}: mean ${t.mean ?? '—'} (at least ${t.minMean}) over ${t.n} valid, verdict ${t.verdict}`);
     if (r.totals) log(`totals: ${r.totals.ok}/${r.totals.calls} ok, $${r.totals.costUsd}, mean latency ${r.totals.latencyMsMean} ms`);
   }
 

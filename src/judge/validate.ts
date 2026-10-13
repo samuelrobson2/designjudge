@@ -1,4 +1,4 @@
-import { LAYOUT_ANCHORS, LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
+import { categoryOf } from '../categories/index.ts';
 import { layoutOutputZod, type LayoutJudgment } from '../categories/layout/schema.ts';
 import type { Packet } from '../categories/types.ts';
 
@@ -46,7 +46,8 @@ export function parseOutput(text: string | null): { value: unknown; error?: stri
 export function validateJudgment(value: unknown, packet: Packet, opts: { requireEvidence?: boolean } = {}): { output: LayoutJudgment | null; validation: Validation } {
   const requireEvidence = opts.requireEvidence ?? true;
   const empty = { findings: 0, strengths: 0, weaknesses: 0, missedOpportunities: 0, material: 0, refs: 0, validRefs: 0, findingsWithValidRef: 0, missingEvidenceNotes: 0 };
-  const parsed = layoutOutputZod().safeParse(value);
+  const category = categoryOf(packet.category ?? 'layout');
+  const parsed = layoutOutputZod(category.criteria).safeParse(value);
   if (!parsed.success) {
     return {
       output: null,
@@ -71,7 +72,7 @@ export function validateJudgment(value: unknown, packet: Packet, opts: { require
   );
   for (const s of ['desktop', 'tablet', 'mobile', 'stress-desktop']) stateIds.add(s);
 
-  for (const c of LAYOUT_CRITERIA) {
+  for (const c of category.criteria) {
     for (const f of output.criteria[c.id].findings) {
       stats.findings++;
       if (f.polarity === 'strength') stats.strengths++;
@@ -109,7 +110,7 @@ export function validateJudgment(value: unknown, packet: Packet, opts: { require
   for (const id of decisive ?? []) {
     if (!seen.has(id)) otherIssues.push(`Decisive finding "${id}" does not exist.`);
   }
-  const anchor = LAYOUT_ANCHORS.find((a) => a.score === output.overall.score);
+  const anchor = category.anchors.find((a) => a.score === output.overall.score);
   if (anchor && anchor.label !== output.overall.anchor) {
     otherIssues.push(`Score ${output.overall.score} does not match anchor "${output.overall.anchor}" (expected "${anchor.label}").`);
   }

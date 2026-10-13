@@ -1,0 +1,11 @@
+{
+  "id": "harmless-title-tracking",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Page title tracking tightened slightly",
+  "symptom": "The page title's letter-spacing goes from -0.01em to -0.02em.",
+  "where": {},
+  "severity": "none",
+  "css": ".page__intro h1 { letter-spacing: -0.02em !important; }",
+  "js": null
+}

@@ -9,7 +9,7 @@ import type { Packet } from '../src/categories/types.ts';
 const parsed = parseLayoutRubric();
 
 describe('layout_rubric.md parsing', () => {
-  it('finds all twelve diagnostics with a pass definition or reference values', () => {
+  it('finds all thirteen diagnostics with a pass definition or reference values', () => {
     expect(parsed.diagnostics.map((d) => d.diagId)).toEqual([
       'region_overlap',
       'container_overflow',
@@ -21,6 +21,7 @@ describe('layout_rubric.md parsing', () => {
       'content_growth_failures',
       'spatial_grouping',
       'responsive_adaptation',
+      'media_fit',
       'alignment_outliers',
       'layout_stability',
     ]);
@@ -36,7 +37,7 @@ describe('layout_rubric.md parsing', () => {
     expect(map).toEqual({
       A: ['responsive_adaptation', 'interactive_reachability', 'spatial_grouping', 'alignment_outliers', 'region_overlap'],
       B: ['container_overflow', 'content_growth_failures'],
-      C: ['responsive_adaptation', 'collapsed_dimensions', 'region_overlap', 'occluded_content', 'container_overflow'],
+      C: ['responsive_adaptation', 'collapsed_dimensions', 'media_fit', 'region_overlap', 'occluded_content', 'container_overflow'],
       D: ['responsive_adaptation', 'responsive_layout_failures', 'content_growth_failures', 'page_horizontal_overflow', 'interactive_reachability', 'layout_stability'],
     });
   });

@@ -1,0 +1,13 @@
+{
+  "description": "v1 with two checks under criterion C: Label in Name (WCAG 2.5.3) and Reduced Motion Support, which replaces the reduced-motion item of the Rendered Style Vocabulary measurement. Reads the rubric lines marked for the added checks.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

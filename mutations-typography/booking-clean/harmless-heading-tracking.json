@@ -1,0 +1,17 @@
+{
+  "id": "harmless-heading-tracking",
+  "case": "booking-clean",
+  "kind": "harmless",
+  "title": "Slightly tighter tracking on the title and headings",
+  "symptom": "The page title gets letter-spacing −0.015em and the step and summary headings −0.01em. Sizes, weights and families are unchanged.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "none",
+  "css": ".page__title { letter-spacing: -0.015em; }\n.form-section__head h2, .summary__card h2 { letter-spacing: -0.01em; }",
+  "js": null
+}

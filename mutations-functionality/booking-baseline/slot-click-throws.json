@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-slot]\");\n  if (!el) return;\n  window.djTrackSlot(el.dataset.slot);\n}, true);",
+  "case": "booking-baseline",
+  "id": "slot-click-throws",
+  "kind": "defect",
+  "title": "Choosing a time raises a script error",
+  "symptom": "Every click on a time slot raises an uncaught script error (a tracking call to a function that does not exist). The slot is still selected, but the error is a sign of broken code on the main path.",
+  "where": {},
+  "severity": "minor"
+}

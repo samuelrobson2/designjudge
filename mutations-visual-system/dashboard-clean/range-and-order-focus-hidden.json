@@ -1,0 +1,15 @@
+{
+  "css": ".segmented__btn:focus, .segmented__btn:focus-visible, .order-link:focus, .order-link:focus-visible { outline: none !important; box-shadow: none !important; }",
+  "js": null,
+  "case": "dashboard-clean",
+  "id": "range-and-order-focus-hidden",
+  "kind": "defect",
+  "title": "No focus indication on the date range and orders",
+  "symptom": "The date-range buttons and the order links have their focus outline removed with no replacement, so a keyboard user cannot see which range or order they are on.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "moderate"
+}

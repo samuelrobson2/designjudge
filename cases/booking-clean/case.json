@@ -1,0 +1,20 @@
+{
+  "id": "booking-clean",
+  "title": "Physio booking — revised",
+  "summary": "A separately revised version of the booking page, built for the same request.",
+  "request": "Build a web page where patients of a physiotherapy clinic can book an appointment: choose a treatment, pick a practitioner, choose an available date and time, enter their details, and confirm the booking.",
+  "source": {
+    "type": "static",
+    "dir": "site"
+  },
+  "entry": "/index.html",
+  "fixtures": {
+    "supported": [
+      "empty",
+      "typical",
+      "dense",
+      "expanded",
+      "stress"
+    ]
+  }
+}

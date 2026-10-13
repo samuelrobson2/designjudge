@@ -1,0 +1,11 @@
+{
+  "id": "zero-size-note",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Summary note rendered at 0 px",
+  "symptom": "The note under the Confirm button has font-size 0, so its text takes no space and cannot be read.",
+  "where": {},
+  "severity": "moderate",
+  "css": ".summary__note { font-size: 0 !important; }",
+  "js": null
+}

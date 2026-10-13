@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from '../../config.ts';
 import { sha256 } from '../../util.ts';
 import type { Packet } from '../types.ts';
+import { promptDir, readRubric, readsAddedChecks } from '../versions.ts';
 import { layoutCategory } from './definition.ts';
 import { packetVersionFor, type PacketOptions } from './packet.ts';
 import { FINDINGS_RENDER_VERSION, RENDER_VERSION, renderSystem, renderUserParts, type UserPart } from './render.ts';
@@ -53,24 +53,17 @@ export interface PromptConfig {
   materiality?: SchemaOptions['materiality'];
   // A file in the prompt folder whose text replaces the rubric's scoring section.
   scoring?: string;
+  // A file in the prompt folder used in place of the category's rubric file (no-checks categories).
+  rubricFile?: string;
   // Findings packets: each measured value as a block shaped like a check issue.
   measurementBlocks?: boolean;
 }
 
-function promptDir(version: string): string {
-  return path.join(ROOT, 'src/categories/layout/prompts', version);
-}
+export { listPromptVersions, promptDir } from '../versions.ts';
 
-export function listPromptVersions(): string[] {
-  return fs
-    .readdirSync(path.join(ROOT, 'src/categories/layout/prompts'))
-    .filter((v) => fs.existsSync(path.join(promptDir(v), 'config.json')))
-    .sort();
-}
-
-export function promptConfig(version: string): PromptConfig {
-  const file = path.join(promptDir(version), 'config.json');
-  if (!fs.existsSync(file)) throw new Error(`Unknown prompt version "${version}" (no ${file})`);
+export function promptConfig(version: string, category = 'layout'): PromptConfig {
+  const file = path.join(promptDir(version, category), 'config.json');
+  if (!fs.existsSync(file)) throw new Error(`Unknown ${category} prompt version "${version}" (no ${file})`);
   return JSON.parse(fs.readFileSync(file, 'utf8')) as PromptConfig;
 }
 
@@ -87,7 +80,7 @@ export function buildLayoutRequest(packet: Packet, bundleDirAbs: string, promptV
   const systemTpl = fs.readFileSync(path.join(dir, 'system.md'), 'utf8');
   const userTpl = fs.readFileSync(path.join(dir, 'user.md'), 'utf8');
   const scoringTpl = config.scoring ? fs.readFileSync(path.join(dir, config.scoring), 'utf8').trim() : undefined;
-  const rubricRaw = fs.readFileSync(layoutCategory.rubricPath, 'utf8').trim();
+  const rubricRaw = readRubric(layoutCategory.rubricPath, readsAddedChecks('layout', promptVersion)).trim();
   const schema = layoutOutputJsonSchema(undefined, { describe: config.schemaDescriptions, decisive: config.decisiveFindings, materiality: config.materiality });
 
   let instructions: string;
@@ -98,7 +91,7 @@ export function buildLayoutRequest(packet: Packet, bundleDirAbs: string, promptV
     instructions = renderSystem(systemTpl, parsed, scoringTpl);
     ({ parts: userParts, text: userText } = renderUserParts(userTpl, packet, parsed, { measurementBlocks: config.measurementBlocks }));
   } else {
-    const rubric = config.rubric === 'judge' ? judgeRubricText() : rubricRaw;
+    const rubric = config.rubric === 'judge' ? judgeRubricText(parseLayoutRubric(rubricRaw)) : rubricRaw;
     instructions = systemTpl.replace('{{RUBRIC}}', rubric);
     userText = userTpl
       .replace('{{REQUEST_JSON}}', JSON.stringify(packet.request))

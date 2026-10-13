@@ -1,0 +1,11 @@
+{
+  "css": ":root { --up: #86c79f; --down: #ec9d97; }",
+  "js": null,
+  "case": "dashboard-clean",
+  "id": "gains-and-losses-pale",
+  "kind": "defect",
+  "title": "Gains, losses and \"Delivered\" drawn in pale text",
+  "symptom": "The up and down colours are lightened to pale green and pale red, so every KPI change (\"▲ 12.4%\"), the revenue comparison and the \"Delivered\" badges read at about 2:1, and whether sales rose or fell is hard to make out.",
+  "where": {},
+  "severity": "moderate"
+}

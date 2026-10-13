@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "document.addEventListener('submit', (e) => {\n  const missing = !document.querySelector('.option.is-selected') || !document.querySelector('.slot.is-selected') || !document.getElementById('name')?.value.trim() || !document.getElementById('email')?.value.includes('@');\n  if (missing) { e.preventDefault(); e.stopImmediatePropagation(); }\n}, true);",
+  "case": "booking-clean",
+  "id": "silent-validation",
+  "kind": "defect",
+  "title": "Incomplete bookings are silently ignored",
+  "symptom": "Pressing \"Confirm booking\" with required details missing does nothing: no error summary and no field messages, so the user cannot tell why nothing happened. A complete booking still confirms.",
+  "where": {
+    "interaction": "Press \"Confirm booking\" with the form empty"
+  },
+  "severity": "moderate"
+}

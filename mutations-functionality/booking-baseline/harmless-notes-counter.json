@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { const ta = document.getElementById('notes');\nif (ta && !document.getElementById('notes-count')) { const p = document.createElement('p'); p.id = 'notes-count'; p.className = 'optional'; p.textContent = ta.value.length + ' / 500 characters'; ta.after(p); } };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });\ndocument.addEventListener('input', (e) => { if (e.target.id === 'notes') { const p = document.getElementById('notes-count'); if (p) p.textContent = e.target.value.length + ' / 500 characters'; } });",
+  "case": "booking-baseline",
+  "id": "harmless-notes-counter",
+  "kind": "harmless",
+  "title": "Character counter under the notes field",
+  "symptom": "A \"0 / 500 characters\" counter appears under \"Anything we should know?\" and counts as the user types.",
+  "where": {},
+  "severity": "none"
+}

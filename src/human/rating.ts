@@ -1,7 +1,7 @@
 // The parts of a human rating that do not touch the disk, shared by the local viewer and the
 // hosted rating site.
 
-import { LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
+import { categoryOf } from '../categories/index.ts';
 import type { LayoutJudgment } from '../categories/layout/schema.ts';
 import type { Packet } from '../categories/types.ts';
 import { validateJudgment, type Validation } from '../judge/validate.ts';
@@ -11,6 +11,8 @@ import { timestampId } from '../util.ts';
 export interface HumanRating {
   schemaVersion: 1;
   ratingId: string;
+  // Absent on Layout ratings, which keep the shape they had before other categories were rated.
+  category?: string;
   caseId: string;
   bundleId: string;
   interfaceId: string;
@@ -51,6 +53,10 @@ export interface RatingContext {
 
 export const RATER_MAX_LENGTH = 80;
 
+// Layout ratings sit directly in the ratings directory; every other category has a subdirectory
+// of its own, laid out the same way (<case>/<ratingId>.json, plus its CSVs).
+export const categoryDir = (category: string) => (category === 'layout' ? '' : category);
+
 // Validates against the same schema and evidence index as the judge; rejects schema-invalid
 // output so every stored rating is comparable with a judgment. Unlike the judge, a person may
 // leave notes and summaries empty, and may make call-outs (findings) without citing evidence.
@@ -63,10 +69,12 @@ export function makeRating(ctx: RatingContext, input: RatingInput): { rating?: H
   const createdAt = new Date();
   const slug = rater.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'rater';
   const started = input.startedAt ? new Date(input.startedAt).getTime() : NaN;
+  const category = ctx.packet.category ?? 'layout';
   return {
     rating: {
       schemaVersion: 1,
       ratingId: `${timestampId(createdAt)}-${slug}`,
+      ...(category === 'layout' ? {} : { category }),
       caseId: ctx.caseId,
       bundleId: ctx.bundleId,
       interfaceId: ctx.interfaceId,
@@ -98,15 +106,17 @@ export const ratingListItem = (r: HumanRating) => ({
 
 type Finding = LayoutJudgment['criteria'][string]['findings'][number];
 
-// ratings.csv (one row per rating), findings.csv and points.csv, in the same shape as a run's.
-export function humanCsvs(ratings: HumanRating[]): Record<'ratings.csv' | 'findings.csv' | 'points.csv', string> {
+// ratings.csv (one row per rating), findings.csv and points.csv, in the same shape as a run's,
+// for the ratings of one category.
+export function humanCsvs(ratings: HumanRating[], category = 'layout'): Record<'ratings.csv' | 'findings.csv' | 'points.csv', string> {
+  const criteria = categoryOf(category).criteria;
   const findings = (r: HumanRating): (Finding & { criterion: string })[] =>
-    LAYOUT_CRITERIA.flatMap((c) => (r.output.criteria[c.id]?.findings ?? []).map((f) => ({ ...f, criterion: c.id })));
+    criteria.flatMap((c) => (r.output.criteria[c.id]?.findings ?? []).map((f) => ({ ...f, criterion: c.id })));
   const ratingRows = [
     [
       'rating_id', 'case_id', 'bundle_id', 'interface_id', 'prompt_version', 'packet_hash', 'view', 'rater', 'created_at', 'duration_min',
       'score', 'anchor', 'strengths', 'weaknesses', 'material_weaknesses', 'reasoning',
-      ...LAYOUT_CRITERIA.map((c) => `criterion_${c.id}_summary`), 'missing_evidence', 'untrusted_content_notes', 'refs', 'valid_refs', 'ref_errors',
+      ...criteria.map((c) => `criterion_${c.id}_summary`), 'missing_evidence', 'untrusted_content_notes', 'refs', 'valid_refs', 'ref_errors',
     ],
     ...ratings.map((r) => {
       const fs_ = findings(r);
@@ -115,7 +125,7 @@ export function humanCsvs(ratings: HumanRating[]): Record<'ratings.csv' | 'findi
         r.ratingId, r.caseId, r.bundleId, r.interfaceId, r.promptVersion, r.packetHash, r.view ?? 'screenshots', r.rater, r.createdAt,
         r.durationMs === null ? null : Math.round(r.durationMs / 6000) / 10,
         r.output.overall.score, r.output.overall.anchor, fs_.length - weak.length, weak.length, weak.filter((f) => f.materiality === 'material').length, r.output.overall.reasoning,
-        ...LAYOUT_CRITERIA.map((c) => r.output.criteria[c.id]?.summary ?? ''),
+        ...criteria.map((c) => r.output.criteria[c.id]?.summary ?? ''),
         r.output.missing_evidence.map((m) => `${m.evidence} (${m.affected_criteria.join(', ')}): ${m.effect_on_assessment}`).join(' | '),
         r.output.untrusted_content_notes.join(' | '),
         r.validation.stats.refs, r.validation.stats.validRefs, r.validation.refIssues.filter((i) => i.severity === 'error').length,
@@ -133,7 +143,7 @@ export function humanCsvs(ratings: HumanRating[]): Record<'ratings.csv' | 'findi
   const pointRows = [
     ['rating_id', 'case_id', 'rater', 'criterion', 'evaluation_point', 'point_name', 'applicable', 'assessment'],
     ...ratings.flatMap((r) =>
-      LAYOUT_CRITERIA.flatMap((c) =>
+      criteria.flatMap((c) =>
         c.points.flatMap((p) => {
           const e = r.output.criteria[c.id]?.evaluation_points[p.key];
           if (!e || (e.applicable && !e.assessment.trim())) return [];

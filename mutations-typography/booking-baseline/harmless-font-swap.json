@@ -1,0 +1,11 @@
+{
+  "id": "harmless-font-swap",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Whole page set in Helvetica",
+  "symptom": "The page uses Helvetica/Arial throughout instead of the system font. One family, same sizes and weights.",
+  "where": {},
+  "severity": "none",
+  "css": "html, body, button, input, select, textarea { font-family: Helvetica, Arial, sans-serif !important; }",
+  "js": null
+}

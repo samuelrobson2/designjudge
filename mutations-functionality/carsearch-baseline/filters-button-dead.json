@@ -1,0 +1,19 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-action=\\\"open-filters\\\"]\");\n  if (!el) return;\n  e.stopPropagation();\n}, true);",
+  "case": "carsearch-baseline",
+  "id": "filters-button-dead",
+  "kind": "defect",
+  "title": "Filters button does nothing on phones",
+  "symptom": "On phones the \"Filters\" button no longer opens the filter drawer, so a phone user cannot filter the results at all.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ]
+  },
+  "severity": "severe"
+}

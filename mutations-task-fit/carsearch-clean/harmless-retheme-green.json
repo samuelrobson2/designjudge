@@ -1,0 +1,11 @@
+{
+  "css": ":root { --primary: #0f7a4a; --primary-hover: #0b603a; --primary-soft: #e3f4ec; --good: #0f7a4a; }",
+  "js": null,
+  "case": "carsearch-clean",
+  "id": "harmless-retheme-green",
+  "kind": "harmless",
+  "title": "Primary colour changed to green",
+  "symptom": "The primary colour, its hover shade and its tint change from blue to green. Nothing else changes.",
+  "where": {},
+  "severity": "none"
+}

@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll(\"#h-revenue, .kpi__label, .card__sub, .legend__item--prev\").forEach((el) => { const to = {\"Revenue\":\"Revenue, last 7 days\",\"Orders\":\"Orders this year\",\"Average order value\":\"Average order value, all time\",\"Conversion rate\":\"Conversion rate, today\",\"Ranked by revenue\":\"Last 90 days, ranked by units sold\",\"Select an order to see its items.\":\"Orders from the last hour. Select one to see its items.\",\"1–14 Aug\":\"Same days last year\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "dashboard-clean",
+  "id": "conflicting-periods",
+  "kind": "defect",
+  "title": "Figures labelled with periods that contradict each other",
+  "symptom": "With \"This month\" selected and the page saying \"1–14 Sep, compared with 1–14 Aug\", the cards claim other periods: \"Revenue, last 7 days\", \"Orders this year\", \"Average order value, all time\", \"Conversion rate, today\", top products \"Last 90 days, ranked by units sold\" (they are ranked by revenue) and \"Orders from the last hour\" over a list spanning two days.",
+  "where": {},
+  "severity": "severe"
+}

@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-action=\\\"clear\\\"]\");\n  if (!el) return;\n  e.stopPropagation(); throw new TypeError('Cannot read properties of undefined (reading \\'reset\\')');\n}, true);",
+  "case": "carsearch-baseline",
+  "id": "clear-all-throws",
+  "kind": "defect",
+  "title": "\"Clear all\" crashes instead of clearing",
+  "symptom": "\"Clear all\" in the filters raises a script error and leaves every filter in place.",
+  "where": {},
+  "severity": "moderate"
+}

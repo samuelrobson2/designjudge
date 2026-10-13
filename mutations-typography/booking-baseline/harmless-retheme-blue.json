@@ -1,0 +1,11 @@
+{
+  "id": "harmless-retheme-blue",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Brand colour changed to blue",
+  "symptom": "Accent colours change from teal to blue. Type is untouched.",
+  "where": {},
+  "severity": "none",
+  "css": ":root { --primary: #1d4ed8; --primary-hover: #1e40af; --primary-tint: #eef2ff; --bg: #f6f8fb; }",
+  "js": null
+}

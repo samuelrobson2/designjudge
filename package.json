@@ -7,6 +7,8 @@
   "scripts": {
     "dj": "node --import tsx src/cli.ts",
     "collect": "node --import tsx src/cli.ts collect",
+    "visual": "node --import tsx src/cli.ts visual",
+    "probe": "node --import tsx src/cli.ts probe",
     "diagnose": "node --import tsx src/cli.ts diagnose",
     "judge": "node --import tsx src/cli.ts judge",
     "report": "node --import tsx src/cli.ts report",
@@ -16,6 +18,7 @@
     "publish": "node --import tsx src/cli.ts publish",
     "human-csvs": "node --import tsx src/cli.ts human-csvs",
     "calibration-data": "node --import tsx src/cli.ts calibration-data",
+    "determinism": "node --import tsx src/cli.ts determinism",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -23,6 +26,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "axe-core": "4.14.0",
     "esbuild": "^0.28.2",
     "playwright": "^1.63.0",
     "sharp": "^0.34.5",

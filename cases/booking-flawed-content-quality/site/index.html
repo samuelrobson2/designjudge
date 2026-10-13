@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Book an appointment · Harbour Physio</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .intro-copy { display: grid; gap: 12px; padding: 32px 0 4px; color: var(--muted); }
+      .step-intro { margin: -4px 0 16px; color: var(--muted); }
+      .step-intro--field { margin: 0; font-size: 14px; }
+      .summary-note { margin-top: 16px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#booking">Skip to booking form</a>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="#" aria-label="Harbour Physio home">
+          <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#0f766e" /><path d="M9 17c3-5 11-5 14 0M11 21c2.5-3 7.5-3 10 0" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" /></svg>
+          <span class="brand__name">Harbour Physio</span>
+          <span class="brand__location">Clapham</span>
+        </a>
+        <a class="header-phone" href="tel:02079460321">020 7946 0321</a>
+      </div>
+    </header>
+    <main id="app" class="page"></main>
+    <script type="module" src="app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        {
+          const apply = () => { const t = document.querySelector('.error-summary__title'); if (t && t.textContent !== 'Error') t.textContent = 'Error';
+          const vague = ['Field required', 'Invalid selection', 'Invalid input', 'Error: validation failed'];
+          document.querySelectorAll('.error-summary a').forEach((a, i) => { const to = vague[i % vague.length]; if (a.textContent !== to) a.textContent = to; });
+          document.querySelectorAll('.field-error').forEach((p) => { if (p.textContent !== 'Invalid') p.textContent = 'Invalid'; }); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+        {
+          const apply = () => { const form = document.getElementById('booking');
+          const first = form && form.querySelector('.form-section');
+          if (first && !form.querySelector('.intro-copy')) {
+            first.insertAdjacentHTML('beforebegin', '<div class="intro-copy"><p>Welcome to the Harbour Physio online appointment booking system. We are delighted that you have chosen to book your physiotherapy appointment with us online today.</p><p>Booking an appointment online is quick, easy and convenient. Simply follow the steps on this page in order, from the first step to the last step, and then confirm your booking at the end of the process. Each step is numbered so that you always know which step you are on.</p><p>Please note that all of the required fields must be completed before your booking can be confirmed. If you have any questions about the booking process, please do not hesitate to contact our friendly reception team, who will be happy to help you with your booking.</p></div>');
+          }
+          const intros = {"h-treatment":"In this step, please select the treatment that you would like to book from the list of treatments shown below. Each treatment shows its name, its price and its length in minutes, together with a short description of the treatment. If you are not sure which treatment to choose, we recommend that you choose an initial assessment.","h-practitioner":"In this step, please choose the practitioner that you would like to see. If you do not mind which practitioner you see, please choose Any available, which will show you all of the available appointment times with all of our practitioners.","h-time":"In this step, please choose a date and then a time for your appointment. The dates are shown in the date strip below, and the times are shown below the dates, divided into morning times and afternoon times. Times are shown for any available practitioner.","h-details":"In this step, please enter your personal details in the fields below so that we are able to contact you about your appointment. We will send a confirmation of your booking to the email address that you enter below."};
+          Object.entries(intros).forEach(([id, text]) => { const head = document.getElementById(id)?.closest('.form-section__head'); if (head && !head.nextElementSibling?.classList.contains('step-intro')) head.insertAdjacentHTML('afterend', '<p class="step-intro">' + text + '</p>'); });
+          const notes = document.getElementById('notes');
+          if (notes && !notes.previousElementSibling?.classList.contains('step-intro')) notes.insertAdjacentHTML('beforebegin', '<p class="step-intro step-intro--field">Please use this box to tell us anything at all that you think we should know before your appointment, for example the injury or the pain that you would like to have treated at your appointment.</p>');
+          const card = document.querySelector('.summary__card');
+          if (card && !card.querySelector('.summary-note')) card.insertAdjacentHTML('beforeend', '<p class="summary-note">Please check that all of the details shown above in this summary of your appointment are correct before you press the button above to confirm your booking.</p>'); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+      }, { once: true });
+    </script>
+  </body>
+</html>

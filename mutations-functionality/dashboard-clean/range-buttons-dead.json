@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-range]\");\n  if (!el) return;\n  e.stopPropagation();\n}, true);",
+  "case": "dashboard-clean",
+  "id": "range-buttons-dead",
+  "kind": "defect",
+  "title": "Date range cannot be changed",
+  "symptom": "Clicking \"30 days\" or another range does nothing: the selected range, the figures, the chart and the lists stay on the first range, so no other period can be reviewed.",
+  "where": {},
+  "severity": "severe"
+}

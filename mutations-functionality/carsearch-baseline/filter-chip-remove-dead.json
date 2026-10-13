@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-remove]\");\n  if (!el) return;\n  e.stopPropagation();\n}, true);",
+  "case": "carsearch-baseline",
+  "id": "filter-chip-remove-dead",
+  "kind": "defect",
+  "title": "Active filter chips cannot be removed",
+  "symptom": "Clicking the ✕ on an active filter chip does nothing, so a filter can only be removed from the filter panel.",
+  "where": {
+    "interaction": "Apply a filter, then click the ✕ on its chip"
+  },
+  "severity": "moderate"
+}

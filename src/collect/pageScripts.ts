@@ -31,3 +31,11 @@ export async function initScript(fixture: string | null): Promise<string> {
 export async function snapshotScript(): Promise<string> {
   return bundle('snapshot.ts');
 }
+
+export async function quietScript(): Promise<string> {
+  return bundle('quiet.ts');
+}
+
+export async function visualScript(): Promise<string> {
+  return bundle('visual.ts');
+}

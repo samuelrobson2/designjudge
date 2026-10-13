@@ -1,0 +1,15 @@
+{
+  "css": "a:focus, button:focus, input:focus, select:focus, textarea:focus, [tabindex]:focus { outline: none !important; box-shadow: none !important; }",
+  "js": null,
+  "case": "booking-baseline",
+  "id": "focus-ring-removed",
+  "kind": "defect",
+  "title": "Keyboard focus ring removed from every control",
+  "symptom": "A reset rule removes the outline from focused buttons, links and fields and puts nothing in its place, so a keyboard user cannot see which date, time or button is focused.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "severe"
+}

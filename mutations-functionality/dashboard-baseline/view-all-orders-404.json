@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll('.orders-card .card__head a').forEach((a) => { if (a.getAttribute('href') !== 'orders.html') a.setAttribute('href', 'orders.html'); }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "dashboard-baseline",
+  "id": "view-all-orders-404",
+  "kind": "defect",
+  "title": "\"View all orders\" opens a missing page",
+  "symptom": "The \"View all orders\" link points at orders.html, which does not exist, so it opens a \"not found\" page.",
+  "where": {},
+  "severity": "moderate"
+}

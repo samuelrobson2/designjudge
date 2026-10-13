@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "const apply = () => { const t = document.querySelector('.error-summary__title'); if (t && t.textContent !== 'Error') t.textContent = 'Error';\nconst vague = ['Field required', 'Invalid selection', 'Invalid input', 'Error: validation failed'];\ndocument.querySelectorAll('.error-summary a').forEach((a, i) => { const to = vague[i % vague.length]; if (a.textContent !== to) a.textContent = to; });\ndocument.querySelectorAll('.field-error').forEach((p) => { if (p.textContent !== 'Invalid') p.textContent = 'Invalid'; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "booking-clean",
+  "id": "vague-error-messages",
+  "kind": "defect",
+  "title": "Validation messages say nothing useful",
+  "symptom": "After \"Confirm booking\" with missing details, the summary box is titled \"Error\" and lists \"Field required\", \"Invalid selection\", \"Invalid input\" and \"Error: validation failed\", and every message under a field reads \"Invalid\", so the patient cannot tell what is missing or how to fix it.",
+  "where": {
+    "interaction": "Press \"Confirm booking\" with the form empty"
+  },
+  "severity": "severe"
+}

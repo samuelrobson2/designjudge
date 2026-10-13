@@ -1,0 +1,11 @@
+{
+  "css": ".car__media img.car__img { object-fit: contain; background: #eef1f4; color: #586174; }",
+  "js": "const apply = () => { document.querySelectorAll('.car__media').forEach((m) => {\n  if (m.querySelector('img')) return;\n  const n = 2040 + Number((m.closest('.car')?.getAttribute('aria-labelledby') ?? '').replace(/\\D/g, '') || 0);\n  m.innerHTML = '<img class=\"car__img\" src=\"photos/IMG_' + n + '.jpg\" alt=\"IMG_' + n + '.jpg\" />';\n}); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "carsearch-clean",
+  "id": "broken-car-photos",
+  "kind": "defect",
+  "title": "Car photos fail to load",
+  "symptom": "Every listing's picture is a broken image showing only a file name such as \"IMG_2041.jpg\", so no car can be recognised from its photo.",
+  "where": {},
+  "severity": "severe"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "grouping-inverted",
+  "case": "booking-clean",
+  "kind": "defect",
+  "title": "Headings and labels sit closer to the previous item than to their own",
+  "symptom": "The dividers between steps are gone and the spacing is inverted: each step heading sits 48 px above its own options but about 24 px below the previous step, and each field label sits 28 px above its own box but 4 px below the box above it, so headings and labels read as belonging to what comes before them.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": ".form-section { padding: 12px 0 !important; }\n.form-section + .form-section { border-top: 0 !important; }\n.form-section__head { margin-bottom: 48px !important; }\n.booking-form { padding-top: 20px; padding-bottom: 20px; }\n.field { gap: 28px !important; }\n.field + .field { margin-top: 4px !important; }",
+  "js": null
+}

@@ -1,24 +1,428 @@
 {
-  "note": "Expected outcomes for the benchmark. Never read by collection or the judge; used only by compare.",
-  "cases": {
-    "booking-baseline": { "role": "baseline" },
-    "booking-demoted-cta": {
-      "role": "variant",
-      "baseline": "booking-baseline",
-      "change": "The primary 'Confirm booking' action is removed from the summary panel and the mobile action bar, and placed at the end of the page after a policy block, as a small button following two same-sized secondary buttons. No deterministic check targets this; it tests visual judgment of primary focus and priority.",
-      "expected": "must_drop",
-      "criteria": ["A", "D"],
-      "targets": { "checks": [] }
+  "note": "Expected outcomes for the benchmark, one set per judge category. Never read by collection or the judge; used only by compare, which checks each run against its own category's pairs. An interface can be the variant of several pairs. expected: must_drop, may_drop (not higher), no_change (means within half a point), may_rise (not lower), must_rise. Interfaces in no pair are standalone; notes say why one is left out.",
+  "categories": {
+    "layout": {
+      "pairs": [
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-demoted-cta",
+          "change": "The primary 'Confirm booking' action is removed from the summary panel and the mobile action bar, and placed at the end of the page after a policy block, as a small button following two same-sized secondary buttons. No deterministic check targets this; it tests visual judgment of primary focus and priority.",
+          "expected": "must_drop",
+          "criteria": ["A", "D"],
+          "targets": { "checks": [] }
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-mobile-overflow",
+          "change": "On narrow viewports the recent-orders table keeps its desktop form with a 720 px minimum width and no scroll container, so the whole page scrolls horizontally on mobile.",
+          "expected": "must_drop",
+          "criteria": ["C", "D"],
+          "targets": { "checks": [{ "diagId": "page_horizontal_overflow", "stateId": "mobile" }] }
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-clean",
+          "change": "Below 1024 px the revision is one column with the treatments as a radio list, so on tablet with longer or stress content the option-card prices no longer spill out of their cards or overlap the treatment names (the original's container-overflow and region-overlap failures). Related items are spaced further apart than their parts, and bordered controls are at least 16 px apart. The original's tablet failures are material, so it should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-clean",
+          "change": "Below 1024 px the filters move into a drawer, and the compare bar reserves space at the bottom of the page instead of permanently covering the last cards' details and the 'Show more cars' button; on phones with long text the 'Compare now' button no longer runs off the screen. The original's covered content and unreachable button are material, so it should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-flawed-layout",
+          "change": "Each car photo box loses its relative positioning, so all nine heart 'Save' buttons leave their photos and stack in the top-right corner of the page, on top of the header, at every viewport. The results grid keeps three columns of at least 300 px, so below about 1270 px the cards run off the right edge and the page scrolls sideways (944 px wide on a 390 px phone). In the phone filter drawer the list no longer scrolls, so the lower filters and the 'Show 248 cars' button sit below the screen and cannot be reached. Each is material, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["C", "D"],
+          "targets": { "checks": [{ "diagId": "region_overlap", "stateId": "desktop" }, { "diagId": "occluded_content", "stateId": "desktop" }, { "diagId": "page_horizontal_overflow", "stateId": "mobile" }] }
+        },
+        {
+          "baseline": "dashboard-gold",
+          "variant": "dashboard-clean",
+          "change": "Gold has no failed checks and no measurements outside the reference. The revision replaces the sidebar and phone menu with a single top bar and keeps the same blocks (revenue beside its trend, the other metrics, recent orders, top products) in a similar grid, with no failed checks or measurements outside the reference either. No layout weakness is documented in gold, so it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-clean",
+          "change": "The original falls short of the reference in a few measurements (the Top products items barely separated from their parts, phone metric cards 10 px apart, a 12 px phone inset), and in one two-step tablet state the scrim covers the open menu. The revision meets every reference and has no menu. None of these is a documented material weakness, so it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        }
+      ],
+      "no_material_weakness": ["booking-clean", "carsearch-clean", "dashboard-clean"]
     },
-    "dashboard-baseline": { "role": "baseline" },
-    "dashboard-mobile-overflow": {
-      "role": "variant",
-      "baseline": "dashboard-baseline",
-      "change": "On narrow viewports the recent-orders table keeps its desktop form with a 720 px minimum width and no scroll container, so the whole page scrolls horizontally on mobile.",
-      "expected": "must_drop",
-      "criteria": ["C", "D"],
-      "targets": { "checks": [{ "diagId": "page_horizontal_overflow", "stateId": "mobile" }] }
+    "typography": {
+      "pairs": [
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-demoted-cta",
+          "change": "The primary action becomes a small 'Confirm' set at 14 px/550, the same as the two secondary buttons before it (the original's 'Confirm booking' is 16 px/600 and stands alone), and a 'Before you book' block adds an 18 px/620 heading and 15 px muted text. Nothing typographic improves, so it should not score higher; whether the weaker emphasis on the primary action is material is left open.",
+          "expected": "may_drop",
+          "criteria": ["A"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-mobile-overflow",
+          "change": "Text and type CSS are identical, but on phones the recent orders keep the desktop table's width (14 px cells, 12 px uppercase headers) and run off the screen instead of reflowing into cards (15 px and 13 px). Text that does not reflow to fit the phone counts against responsive typography, so it should not score higher.",
+          "expected": "may_drop",
+          "criteria": ["D"]
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-clean",
+          "change": "The revision renders three sizes on each screen (16 px for reading and controls, 20 px section headings, a 28 px title, 24 px on phones) in weights 400, 600 and 700, against the original's eight sizes in 1 px steps and seven weights from 400 to 700. The Oct 7 judgment scored the original 4 with only minor findings, so no material weakness is documented; it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-clean",
+          "change": "The revision renders four sizes (14, 16, 20 and 28 px) in weights 400, 600 and 700, against the original's nine sizes and six weights, and car titles wrap in balanced lines on tablet. One of three earlier judgments called the original's tablet heading wrap material and the other two minor, so a rise is not guaranteed; it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-gold",
+          "variant": "dashboard-clean",
+          "change": "The revision keeps this month's revenue as the largest text (44 px/700, 36 px on phones) and renders five sizes in weights 400, 600 and 700, against gold's eight sizes and eight weights. Gold scored 4 in every earlier judgment with only minor findings, so it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-clean",
+          "change": "The revision makes this month's revenue a 44 px/700 hero and renders five sizes in weights 400, 600 and 700, against the original's six sizes in 1 px steps (12 to 16 px) and seven weights from 400 to 680. The Oct 7 judgment scored the original 4 with only minor findings, so it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-flawed-typography",
+          "change": "The page title and step headings drop to 15 px at weight 400, the same as body text, so the form has no visible hierarchy. Treatment descriptions, durations, the cancellation note and error messages are 10 px, and on phones the intro, field labels and time slots also shrink to 10 px. The original scored 4; each problem is material, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "B", "D"]
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-flawed-typography",
+          "change": "Car names are 30 px at weight 800, larger than the 28 px page title, while prices drop to 14 px regular grey. Names, prices, the filter panel, the page head and the specs each use a different typeface (Georgia, Courier New, Verdana, Trebuchet MS and italic Times New Roman), and on phones the trims, specs, locations, filter labels and form text fall to 11 px. The original scored 4, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "C", "D"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-flawed-typography",
+          "change": "The metric values drop to 14 px regular while their labels and the card headings grow to 32 px bold, larger than the 26 px page title, so the figures the owner tracks are the least prominent text. Table text, product names, statuses and the title are weight 300, and captions, axis labels and subtitles weight 200. The original scored 4, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "B"]
+        }
+      ],
+      "no_material_weakness": ["booking-clean", "carsearch-clean", "dashboard-clean"],
+      "notes": {
+        "dashboard-gold": "Not compared with dashboard-baseline: gold makes this month's revenue a 52 px/750 hero, stronger task-aligned emphasis, but renders more sizes and weights (8 and 8 at desktop, against 6 and 7), so the direction is ambiguous."
+      }
     },
-    "carsearch-baseline": { "role": "standalone" }
+    "task_fit": {
+      "pairs": [
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-demoted-cta",
+          "change": "The requested last step, confirming the booking, moves from the summary panel and the phone action bar to the end of the page, after a policy block of invented clinic rules, as a small 'Confirm' following two unrequested actions ('Save for later', 'Call the clinic'). Coverage is otherwise the same, so it should not score higher. The original already has a material weakness, so a drop is not guaranteed.",
+          "expected": "may_drop",
+          "criteria": ["A", "B"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-gold",
+          "change": "Same capabilities. This month's revenue becomes the hero beside its trend, the unrequested Export button goes, and order lines add up to the order total. It adds one mislabel ('Ranked by revenue' over products ordered by units sold), so it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-mobile-overflow",
+          "change": "Same scope, data and capabilities. On phones the recent orders are a desktop table that scrolls the page sideways instead of tappable cards, a worse fit for reviewing orders on a phone, so it should not score higher; whether Task Fit should drop for a Layout defect is left open.",
+          "expected": "may_drop",
+          "criteria": ["A"]
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-clean",
+          "change": "The revision drops the original's invented clinic facts (the Clapham location, a phone number, a free-cancellation rule, a weekly release time for new appointments and a waitlist link), which the Oct 7 judgment rated a material fabrication. Its dates start tomorrow (the original offers today's times that have already passed), the times shown depend on the chosen practitioner, an 'Any available' booking names the practitioner it assigns, and confirming leads to a screen that recaps the booking. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-clean",
+          "change": "The original fixes the search to Bristol and says 248 cars while listing 9 with no way to see more, both material in the Oct 7 judgment, and its 'Compare now' does nothing. The revision has an editable postcode and distance, a count that matches the cars listed with 'Show more cars' when there are more, and a side-by-side comparison of up to three cars; it drops the unrequested 'Sell your car', saved cars, keyword search and gearbox filter. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-gold",
+          "variant": "dashboard-clean",
+          "change": "Same capabilities: date ranges, the requested metrics, the revenue trend, top products and recent orders with a detail panel. The revision removes gold's sidebar links to pages that do not exist, its 'View all' links and the order panel's Refund and 'Mark as fulfilled', which do nothing, and its top products really are ranked by revenue. Gold scored 4 with no material weakness, so it should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-clean",
+          "change": "The original's order lines do not add up to the order total (#1482: £49 and £35 against £33.86), which the Oct 7 judgment rated a material fabrication, and it adds an Export button that does nothing. In the revision every order's lines add up to its total, all figures come from one daily model, and this month's revenue is the hero beside its trend. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-flawed-task-fit",
+          "change": "The practitioner step is gone, and the date-and-time step is replaced by a request to be phoned back within two working days, so two of the requested steps cannot be done on the page. The details step also asks for a pet's name, species and breed, which belong on a vet's form. It should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "B", "D"]
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-flawed-task-fit",
+          "change": "Two of the four requested filters (mileage and fuel type) are gone on desktop and phone. Four unrequested panels for selling, finance, insurance and warranty push the listings down, and the cars are presented as shop products with 'Add to basket', 'In stock · Free delivery' and a basket. It should score lower.",
+          "expected": "must_drop",
+          "criteria": ["B", "C", "D"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-flawed-task-fit",
+          "change": "The revenue chart and the metric sparklines are gone, so the requested revenue trend is missing. The four metrics are text boxes the owner is told to fill in and save, which makes the dashboard a data-entry form, and a set-up checklist and a Pro trial offer sit above them. It should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "B", "C"]
+        }
+      ],
+      "no_material_weakness": ["booking-clean", "carsearch-clean", "dashboard-clean"]
+    },
+    "content_quality": {
+      "pairs": [
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-demoted-cta",
+          "change": "All of the original's copy remains except the 'Confirm booking' buttons and the phone action bar's summary line and price. It adds a generic 'Confirm' for a booking with a late-cancellation charge, a vague 'Save for later', and a policy block whose cancellation rule repeats the existing note. It should not score higher.",
+          "expected": "may_drop",
+          "criteria": ["A"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-mobile-overflow",
+          "change": "Text and imagery are identical. On phones the recent orders appear as the desktop table with column headers instead of cards with the same values, so Content Quality should score the same.",
+          "expected": "no_change",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-clean",
+          "change": "The original's follow-up treatment promises the physio seen last time while 'Any available' is the default, material in the Oct 7 judgment. The revision drops that promise, names the practitioner assigned to an 'Any available' booking in the summary and the confirmation (the original's confirmation reads 'with Any available'), lists each missing or badly formatted detail in its errors, and removes the invented cancellation rule, release time and waitlist link. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-clean",
+          "change": "The original says 248 cars while listing 9, shows deal badges with no stated basis and hard-codes make and fuel counts that do not match the cars, all but the last material in the Oct 7 judgment. In the revision the count matches the cars listed, each price rating says how far the price is from the average for the same model, age and mileage, the counts come from the cars, and the empty states fit the situation. The cars are still drawn, now coloured and labelled per car. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-gold",
+          "variant": "dashboard-clean",
+          "change": "Gold heads its top products 'Ranked by revenue' over a list ordered by units sold, material in the Oct 7 judgment, and rescales order lines to the total so they no longer match unit prices (a Walnut serving board at £19.75 against £49.00). In the revision top products are ranked by revenue, with units × unit price equal to the revenue shown, order lines use the unit prices and add up to the total, and every figure comes from one daily model. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-clean",
+          "change": "The original's order #1482 lines (£49 and £35) do not add up to its £33.86 total, material in the Oct 7 judgment, and all four metric sparklines plot the same revenue series. In the revision every order's lines add up to its total, the metrics have no sparklines and reconcile (average order value is revenue ÷ orders), and the comparison period is stated once. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-flawed-content-quality",
+          "change": "After 'Confirm booking' with details missing, the error summary is titled 'Error' and lists 'Field required', 'Invalid selection', 'Invalid input' and 'Error: validation failed', and every field message reads 'Invalid', where the original names each missing detail. Three paragraphs of welcome text open the form, each step gets a paragraph restating what it shows, and the summary ends with a note to check the summary. It should not score higher; the original already scores about 2 and the unhelpful errors appear only after submitting, so a drop to 1 is not certain.",
+          "expected": "may_drop",
+          "criteria": ["A", "B"]
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-flawed-content-quality",
+          "change": "Every car picture is a broken image showing only a file name such as 'IMG_2041.jpg', and each 'Great price' or 'Good price' badge now says the car is hundreds of pounds above average. The Compare checkbox changes name from card to card, and cars are also called vehicles, listings and motors. Shoppers can no longer recognise the cars or trust the deal ratings on any card, which makes important information impossible to understand reliably, so it should score lower even though the original scores 2.",
+          "expected": "must_drop",
+          "criteria": ["A", "B", "C"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-flawed-content-quality",
+          "change": "With 'This month' selected, the metric cards and chart claim other periods ('Revenue, last 7 days', 'Orders this year', 'Avg. order value, all time', 'Conversion rate, today') and the comparison line is labelled 'Same days last year'. The orders table, statuses and section headings become internal abbreviations ('Ord#', 'Ts', 'Fulfil. stat', 'PD/UNFUL', 'SKU perf.', 'MTD vs PMTD'). It should not score higher; the original already scores 2 and the figures themselves stay readable, so a drop to 1 is not certain.",
+          "expected": "may_drop",
+          "criteria": ["A"]
+        }
+      ],
+      "no_material_weakness": ["booking-clean", "carsearch-clean", "dashboard-clean"],
+      "notes": {
+        "dashboard-gold": "Not compared with dashboard-baseline: gold makes order lines add up to the total (by rescaling line amounts, which then no longer match unit prices) and drops the KPI sparklines that all plot revenue, but adds 'Ranked by revenue' over products ordered by units sold and rewrites much of the copy, so the direction is ambiguous."
+      }
+    },
+    "visual_system": {
+      "pairs": [
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-demoted-cta",
+          "change": "Palette, components and interaction states are unchanged, but the primary action loses its emphasis: the full-width 'Confirm booking' in the summary panel and the phone action bar are replaced by a small 'Confirm' at the end of the page, the same size and shape as the two secondary buttons beside it and set apart only by its fill. Strong filled colour no longer marks the primary action prominently, so it should not score higher; whether that is material for Visual System is left open.",
+          "expected": "may_drop",
+          "criteria": ["A"]
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-mobile-overflow",
+          "change": "The stylesheet's colours, components, shapes and interaction states are identical; on phones the recent orders keep the desktop table instead of the cards, which runs off the screen. The rubric leaves responsive composition to Layout, and the table uses the same colours and treatment as on desktop, so Visual System should score the same.",
+          "expected": "no_change",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-clean",
+          "change": "The original's treatment and practitioner cards show no change when reached with Tab (focus lands on the hidden radio inside each), so a keyboard user cannot see which option they are on; its 'Not selected' summary text is 3.11:1, its home link's accessible name does not contain its visible text, and its form fields' borders are 1.63:1, below the 3:1 required. The revision has none of these and no failed checks or measurements outside the reference. The original's invisible focus on the primary choices is material, so it should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-clean",
+          "change": "The original's 'Sort by' dropdown has no accessible name (a critical axe violation), its make and fuel counts are 3.1:1 and its 'Fair price' badges 4.28:1, below the 4.5:1 required, and its field and dropdown borders are 1.4–1.51:1, below the 3:1 required. The revision has none of these and no failed checks or measurements outside the reference. The unnamed dropdown and the hard-to-see fields are material, so it should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-clean",
+          "change": "The original renders 26 pieces of supporting text (comparisons, chart values, units sold) at 3.1:1, against 4.5:1 required, and Tab moves focus to 21 controls hidden under the open order panel's scrim. The revision has no failed checks and no measurements outside the reference. Both original weaknesses are material, so it should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-gold",
+          "variant": "dashboard-clean",
+          "change": "Gold renders up to 25 pieces of supporting text at 3.67:1, against 4.5:1 required, and draws its trend arrows as text symbols beside SVG icons. The revision has no failed checks and no measurements outside the reference, and its icons are drawn one way. It should score at least as high.",
+          "expected": "may_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-flawed-visual-system",
+          "change": "A reset rule removes the focus outline from every button, link and field with nothing in its place (21 of 22 tab stops show no focus, against 2 in the original), so a keyboard user cannot see which date, time or button they are on. The labels above Full name, Email, Phone and notes become plain text, so those fields have no accessible name, and the muted text is lightened to about 2.3:1 against 4.5:1 required. Keyboard and screen-reader users can no longer operate the booking reliably, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "C"],
+          "targets": { "checks": [{ "diagId": "focus_visibility", "stateId": "desktop" }, { "diagId": "accessibility_violations", "stateId": "mobile" }, { "diagId": "required_contrast", "stateId": "desktop" }, { "diagId": "required_contrast", "stateId": "mobile" }] }
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-flawed-visual-system",
+          "change": "The 'Great price' and 'Good price' badges are recoloured to pale green and pale blue on their pale tints (1.7:1 and 1.84:1, against 4.5:1 required), so the deal rating no longer reads clearly. The heart Save buttons lose their names, so a screen reader announces nine unnamed buttons, and every third car card gets a grey fill, a dashed border and square corners, the way sold listings usually look. These are material, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "B", "C"],
+          "targets": { "checks": [{ "diagId": "required_contrast", "stateId": "desktop" }, { "diagId": "required_contrast", "stateId": "mobile" }, { "diagId": "accessibility_violations", "stateId": "desktop" }, { "diagId": "accessibility_violations", "stateId": "mobile" }] }
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-flawed-visual-system",
+          "change": "The 'Paid' and 'Pending' status badges are recoloured to pale green and pale amber on their tints (about 1.5:1, against 4.5:1 required), so order status is hard to read. The date-range buttons and sidebar links lose their focus outline with no replacement (10 of 21 tab stops, against none), and the Orders metric card loses its border and gains a deep shadow and tighter corners, unlike its three peers. It should not score higher; the original already scores 2 and these are not plainly failing, so a drop to 1 is not certain.",
+          "expected": "may_drop",
+          "criteria": ["A", "B", "C"],
+          "targets": { "checks": [{ "diagId": "required_contrast", "stateId": "desktop" }, { "diagId": "required_contrast", "stateId": "mobile" }, { "diagId": "focus_visibility", "stateId": "desktop" }] }
+        }
+      ],
+      "no_material_weakness": ["booking-clean", "carsearch-clean", "dashboard-clean"],
+      "notes": {
+        "dashboard-gold": "Not compared with dashboard-baseline: gold restyles most of the dashboard (a 1,221-line stylesheet against 755). Its muted text is darker (3.67:1 against 3.1:1) and the active navigation item no longer falls short of 4.5:1, but it mixes text-symbol trend arrows with SVG icons and adds a near-duplicate radius, so the direction is ambiguous."
+      }
+    },
+    "functionality": {
+      "pairs": [
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-demoted-cta",
+          "change": "The booking flow behaves the same (the same fields, choices, validation and confirmation), but the variant adds two buttons, 'Save for later' and 'Call the clinic', that do nothing when clicked, and drops the phone action bar's Confirm button. More inert controls on the primary path, so it should not score higher.",
+          "expected": "may_drop",
+          "criteria": ["A", "B"],
+          "targets": { "checks": [{ "diagId": "no_effect_controls", "stateId": "desktop" }] }
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-mobile-overflow",
+          "change": "The script is byte-identical and every control behaves the same; on phones the recent orders are the desktop table (whose rows open the same order panel) instead of cards. Functionality should score the same.",
+          "expected": "no_change",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-clean",
+          "change": "In the original, typing an email and then moving to the next field redraws the form and the email is lost (the notes field likewise), so a booking can be confirmed only after entering the email again; its home link is href=\"#\" and leads nowhere. In the revision every field keeps what is typed, every link and control responds, and confirming leads to a screen that recaps the booking. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-clean",
+          "change": "In the original 'Search', 'Show all makes' and every car's Save button do nothing, the keyword search field is wiped when it is left, and the car titles, 'Sell your car' and 'Saved' links are href=\"#\" placeholders. In the revision every control and link responds, the postcode is applied when the location form is submitted, and comparing cars opens a side-by-side comparison. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-clean",
+          "change": "In the original 'Export' and the order panel's 'Refund' and 'Mark as fulfilled' do nothing, and the six navigation links and both 'View all' links are href=\"#\" placeholders. The revision has none of these controls or links, and its date ranges and order panel work. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "dashboard-gold",
+          "variant": "dashboard-clean",
+          "change": "In gold the order panel's 'Refund' and 'Mark as fulfilled' do nothing, and the six navigation links and both 'View all' links are href=\"#\" placeholders. The revision has none of these controls or links, and its order lines use the unit prices and add up to the total. It should score higher.",
+          "expected": "must_rise",
+          "criteria": []
+        },
+        {
+          "baseline": "booking-baseline",
+          "variant": "booking-flawed-functionality",
+          "change": "Pressing 'Confirm booking' (in the summary or the phone action bar) does nothing: an empty form gets no error summary and a complete one no confirmation, so no booking can be made. Clicking another date leaves the first date selected, and every click on a time slot raises an uncaught script error. The primary task can no longer be completed, so it should score lower.",
+          "expected": "must_drop",
+          "criteria": ["A", "B", "D"],
+          "targets": { "checks": [{ "diagId": "form_submission", "stateId": "desktop" }, { "diagId": "form_submission", "stateId": "mobile" }, { "diagId": "toggle_state", "stateId": "desktop" }, { "diagId": "runtime_errors", "stateId": "desktop" }] }
+        },
+        {
+          "baseline": "carsearch-baseline",
+          "variant": "carsearch-flawed-functionality",
+          "change": "On phones the 'Filters' button no longer opens the filter drawer, so phone users cannot filter at all. Ticking a make ticks the box but leaves the results, the count and the filter chips unchanged, and ticking 'Compare' on any car unticks it at once, so listings can never be compared. It should not score higher; the original already scores 2 and on desktop the price, mileage, fuel and sort controls still work, so a drop to 1 is not certain.",
+          "expected": "may_drop",
+          "criteria": ["A", "B", "C"],
+          "targets": { "checks": [{ "diagId": "no_effect_controls", "stateId": "mobile" }, { "diagId": "toggle_state", "stateId": "desktop" }, { "diagId": "toggle_state", "stateId": "mobile" }] }
+        },
+        {
+          "baseline": "dashboard-baseline",
+          "variant": "dashboard-flawed-functionality",
+          "change": "Clicking '30 days' or another range does nothing, so only this month can be reviewed. Clicking an order opens the one below it (#1482 Amara Okafor shows #1481 Liam Chen), and once the panel is open neither Close nor the backdrop closes it. It should not score higher; the original already scores 2 and this month's metrics, chart and products still display correctly, so a drop to 1 is not certain.",
+          "expected": "may_drop",
+          "criteria": ["B", "C", "D"],
+          "targets": { "checks": [{ "diagId": "toggle_state", "stateId": "desktop" }, { "diagId": "toggle_state", "stateId": "mobile" }] }
+        }
+      ],
+      "no_material_weakness": ["booking-clean", "carsearch-clean", "dashboard-clean"],
+      "notes": {
+        "dashboard-gold": "Not compared with dashboard-baseline: gold removes the Export button that did nothing, but its order panel's Refund and 'Mark as fulfilled' still do nothing, and it rescales order lines so they add up to the total while no longer matching unit prices (a State and Data Integrity weakness the baseline does not have in that form), so the direction is ambiguous."
+      }
+    }
   }
 }

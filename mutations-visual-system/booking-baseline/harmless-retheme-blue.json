@@ -1,0 +1,11 @@
+{
+  "css": ":root { --primary: #1d4ed8; --primary-hover: #1e40af; --primary-tint: #eef2ff; }",
+  "js": null,
+  "case": "booking-baseline",
+  "id": "harmless-retheme-blue",
+  "kind": "harmless",
+  "title": "Brand colour changed to blue",
+  "symptom": "The primary colour, its hover shade and its tint change from teal to blue through the theme variables, consistently everywhere.",
+  "where": {},
+  "severity": "none"
+}

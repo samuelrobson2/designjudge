@@ -1,0 +1,18 @@
+{
+  "id": "minor-product-rows-misgrouped",
+  "case": "dashboard-clean",
+  "kind": "defect",
+  "title": "Top products' bars and sales sit closer to the next product than to their own",
+  "symptom": "In Top products each name and revenue sit 22 px above their own bar, while the bar and its \"sold\" count sit 2 px above the next product's name, so every bar and count reads as belonging to the product below it.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "minor",
+  "css": ".products__list { row-gap: 2px !important; }\n.bar { margin-top: 22px !important; }\n.product__meta { margin-top: 2px !important; }",
+  "js": null
+}

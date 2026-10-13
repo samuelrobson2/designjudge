@@ -1,0 +1,11 @@
+{
+  "css": ".deal--great { color: #86c99c; } .deal--good { color: #93b4ef; }",
+  "js": null,
+  "case": "carsearch-baseline",
+  "id": "deal-badges-low-contrast",
+  "kind": "defect",
+  "title": "Deal badges drawn in pale text on pale tints",
+  "symptom": "The \"Great price\" and \"Good price\" badges are recoloured to pale green and pale blue text on their pale tints, about 1.8:1, so the deal rating is hard to read.",
+  "where": {},
+  "severity": "moderate"
+}

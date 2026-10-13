@@ -1,0 +1,13 @@
+{
+  "description": "v1 with checks of what the page says about its own data under criterion C (counts, totals, sort order, period, the opened detail, unfilled template values) and the Validation Message Wording measurement under D, so C is no longer judged from the screenshots alone and measurements are rendered. Reads the rubric lines marked for the added checks.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

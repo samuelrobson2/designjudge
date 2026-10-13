@@ -30,6 +30,10 @@ export const CLOSE_TO_REFERENCE = {
   areaShrink: 0.9,
   compressedWidthPx: 120,
   mediaAspectChange: 0.25,
+  // Pictures: a content picture with less than this share of it visible in its box (reference:
+  // about half), or drawn with an aspect ratio at least this far from its natural one (reference ~5%).
+  mediaShown: 0.6,
+  mediaDistortion: 0.04,
 };
 
 const MAX_ISSUES_PER_CHECK = 8;
@@ -51,6 +55,8 @@ export interface FindingLine {
   // Set when screenshots are marked: the finding's label and the screenshots showing it.
   marker?: string;
   marked_in?: string[];
+  // Screenshots that show a whole-state value (a profile has no element boxes to place).
+  shots?: string[];
 }
 
 export interface CheckBlock {
@@ -87,11 +93,15 @@ const MEASURES_FALLBACK: Record<string, string> = {
   spatial_grouping: 'spacing inside and between groups, clearance between neighbouring controls and boxes, and inset from the screen edge on narrow screens',
   alignment_outliers: 'whether repeated peer elements share edges or centres',
   responsive_adaptation: 'how components change size and structure as the width changes',
+  media_fit: 'how much of each picture (image, video, canvas, SVG drawing or background image) is visible in its box, and whether it keeps its natural aspect ratio',
   layout_stability: 'unexpected layout shifts while the page loads',
 };
 
 const CHECK_ORDER = ['region_overlap', 'container_overflow', 'page_horizontal_overflow', 'interactive_reachability', 'collapsed_dimensions', 'occluded_content', 'responsive_layout_failures'];
-const OBSERVATION_ORDER = ['spatial_grouping', 'alignment_outliers', 'responsive_adaptation', 'layout_stability'];
+const OBSERVATION_ORDER = ['spatial_grouping', 'alignment_outliers', 'media_fit', 'responsive_adaptation', 'layout_stability'];
+// Read by Layout v7 and later.
+const ADDED_CHECK_ORDER = ['proximity_inversion', 'broken_images'];
+const ADDED_OBSERVATION_ORDER = ['text_truncation', 'row_imbalance', 'hidden_scroll_items', 'pinned_over_used', 'viewport_parity'];
 const ANCHORS = ['desktop', 'tablet', 'mobile', 'stress-desktop'];
 
 // ---------- States in plain words ----------
@@ -107,7 +117,10 @@ const FIXTURE_WORDS: Record<string, string> = {
 const ROLE_NOUN: Record<string, string> = { a: 'link', radio: 'option', tr: 'row', menuitem: 'menu item', combobox: 'dropdown', li: 'list item' };
 
 function clickedControl(description: string | undefined): { phrase: string; effects: string[] } | null {
-  const m = description?.match(/^After clicking (\S+) "(.+?)"(?=:|$)/);
+  const control = (role: string, label: string) => `the "${label}" ${ROLE_NOUN[role] ?? role}`;
+  const m =
+    description?.match(/^After clicking (\S+) "(.+?)"(?:, then (\S+) "(.+?)")?(?=:|$)/) ??
+    description?.match(/^After applying (\d+) choices \((.+?)\)(?=:|$)/);
   if (!m) return null;
   // What the interaction did, not how much of the screen changed.
   const effects = description!
@@ -115,7 +128,8 @@ function clickedControl(description: string | undefined): { phrase: string; effe
     .replace(/^:\s*/, '')
     .split(/;\s*/)
     .filter((e) => e && !/%|\bpx\b|moved or resized|content appeared|content was removed|became \d+/.test(e));
-  return { phrase: `after clicking the "${m[2]}" ${ROLE_NOUN[m[1]] ?? m[1]}`, effects };
+  if (m[0].startsWith('After applying')) return { phrase: `after applying ${m[1]} choices (${m[2].replace(/\b\S+ "/g, '"')})`, effects };
+  return { phrase: `after clicking ${control(m[1], m[2])}${m[3] ? `, then ${control(m[3], m[4])}` : ''}`, effects };
 }
 
 export function stateName(s: StateRecord): string {
@@ -128,7 +142,56 @@ export function stateName(s: StateRecord): string {
   return click ? `${device} ${click.phrase}` : `${device}: ${s.interactiveDescription ?? s.label}`;
 }
 
-function stateLine(s: StateRecord): FindingsState {
+// How states are ordered and named in "Where" lines.
+export function placeWords(bundle: Bundle): { rank: (id: string | null) => number; where: (stateIds: (string | null)[]) => string } {
+  const byId = new Map(bundle.states.map((s) => [s.id, s]));
+  const sweepWidths = [...(bundle.sweep?.widths ?? [])].sort((a, b) => a - b);
+  const interactiveOrder = bundle.states.filter((s) => s.kind === 'interactive').map((s) => s.id);
+  const stateRank = (id: string | null): number => {
+    if (id === null) return 10_000;
+    const a = ANCHORS.indexOf(id);
+    if (a >= 0) return a;
+    const s = byId.get(id);
+    if (!s) return 9_000;
+    if (s.kind === 'interactive') return 10 + interactiveOrder.indexOf(id);
+    if (s.kind === 'fixture') return 100 + ['desktop', 'tablet', 'mobile'].indexOf(s.viewportId) * 10 + FIXTURES.indexOf(s.fixture!);
+    if (s.kind === 'sweep') return 1_000 + s.viewport.width;
+    return 5_000;
+  };
+  // Where an issue occurs, in plain words: named states, content variants grouped by device,
+  // and runs of consecutive sweep widths.
+  const where = (stateIds: (string | null)[]): string => {
+    const ids = [...new Set(stateIds)].sort((a, b) => stateRank(a) - stateRank(b));
+    const parts: string[] = [];
+    const fixtures = new Map<string, string[]>();
+    const widths: number[] = [];
+    for (const id of ids) {
+      if (id === null) {
+        parts.push('across widths');
+        continue;
+      }
+      const s = byId.get(id);
+      if (!s) parts.push(id);
+      else if (s.kind === 'sweep') widths.push(s.viewport.width);
+      else if (s.kind === 'fixture') fixtures.set(s.viewportId, [...(fixtures.get(s.viewportId) ?? []), FIXTURE_WORDS[s.fixture!] ?? s.fixture!]);
+      else parts.push(stateName(s));
+    }
+    for (const [vp, words] of fixtures) parts.push(`${(DEVICE[vp] ?? vp).toLowerCase()} with ${orList(words)}`);
+    if (widths.length) {
+      const runs: number[][] = [];
+      for (const w of widths) {
+        const last = runs[runs.length - 1];
+        if (last && sweepWidths.indexOf(w) === sweepWidths.indexOf(last[last.length - 1]) + 1) last.push(w);
+        else runs.push([w]);
+      }
+      parts.push(`at ${widths.length === 1 ? 'width' : 'widths'} ${andList(runs.map((r) => (r.length === 1 ? `${r[0]}` : `${r[0]}–${r[r.length - 1]}`)))} px`);
+    }
+    return parts.join('; ');
+  };
+  return { rank: stateRank, where };
+}
+
+export function stateLine(s: StateRecord): FindingsState {
   const name = stateName(s);
   const pseudo = s.fixture === 'stress' || s.fixture === 'expanded';
   if (s.fixture === 'stress') {
@@ -223,6 +286,17 @@ function namedFromSelector(selector: string, label: string | null, componentId: 
 
 function named(e: ElementRef, summary = ''): Named {
   return namedFromSelector(e.selector, cleanLabel(e.name) ?? labelIn(summary, e.selector), e.componentId);
+}
+
+// Pictures are named by what they show and what they are ("the car image"), not by their tag.
+const PICTURE_WORDS = new Set(['svg', 'img', 'image', 'graphic', 'picture', 'media', 'photo', 'video', 'canvas', 'bg', 'background']);
+
+function pictureNamed(e: ElementRef, source: unknown): Named {
+  const segs = e.selector.split(' > ');
+  const words = (seg: string | undefined) => (seg ? (segmentWords(seg, true) ?? '') : '').split(' ').filter((w) => w && !PICTURE_WORDS.has(w));
+  const own = words(segs[segs.length - 1]);
+  const kind = source === 'video' ? 'video' : source === 'canvas' ? 'canvas' : 'image';
+  return { key: e.selector, noun: [...(own.length ? own : words(segs[segs.length - 2])), kind].join(' '), label: cleanLabel(e.name), labelFirst: false, component: e.componentId };
 }
 
 function one(n: Named): string {
@@ -340,21 +414,13 @@ export function buildFindingsEvidence(
   index: Record<string, EvidenceIndexEntry>,
   // States whose screenshots could show an issue (element boxes are kept for these).
   boxStates: Set<string> = screenshotStates,
+  // Whether the checks and measurements Layout v7 added are read.
+  added = false,
 ): { states: FindingsState[]; criteria: FindingsCriterion[] } {
   const byId = new Map(bundle.states.map((s) => [s.id, s]));
-  const sweepWidths = [...(bundle.sweep?.widths ?? [])].sort((a, b) => a - b);
-  const interactiveOrder = bundle.states.filter((s) => s.kind === 'interactive').map((s) => s.id);
-  const stateRank = (id: string | null): number => {
-    if (id === null) return 10_000;
-    const a = ANCHORS.indexOf(id);
-    if (a >= 0) return a;
-    const s = byId.get(id);
-    if (!s) return 9_000;
-    if (s.kind === 'interactive') return 10 + interactiveOrder.indexOf(id);
-    if (s.kind === 'fixture') return 100 + ['desktop', 'tablet', 'mobile'].indexOf(s.viewportId) * 10 + FIXTURES.indexOf(s.fixture!);
-    if (s.kind === 'sweep') return 1_000 + s.viewport.width;
-    return 5_000;
-  };
+  const sweepWidths = bundle.sweep?.widths ?? [];
+  const places = placeWords(bundle);
+  const stateRank = places.rank;
   const byRank = (a: DiagnosticResult, b: DiagnosticResult) => stateRank(a.stateId) - stateRank(b.stateId);
   const statesWithFindings = new Set<string>();
   const shortName = (id: string | null) => {
@@ -364,36 +430,9 @@ export function buildFindingsEvidence(
     return s.kind === 'stress' ? 'stress' : stateName(s);
   };
 
-  // Where an issue occurs, in plain words: named states, content variants grouped by device,
-  // and runs of consecutive sweep widths.
   const where = (stateIds: (string | null)[]): string => {
-    const ids = [...new Set(stateIds)].sort((a, b) => stateRank(a) - stateRank(b));
-    const parts: string[] = [];
-    const fixtures = new Map<string, string[]>();
-    const widths: number[] = [];
-    for (const id of ids) {
-      if (id === null) {
-        parts.push('across widths');
-        continue;
-      }
-      statesWithFindings.add(id);
-      const s = byId.get(id);
-      if (!s) parts.push(id);
-      else if (s.kind === 'sweep') widths.push(s.viewport.width);
-      else if (s.kind === 'fixture') fixtures.set(s.viewportId, [...(fixtures.get(s.viewportId) ?? []), FIXTURE_WORDS[s.fixture!] ?? s.fixture!]);
-      else parts.push(stateName(s));
-    }
-    for (const [vp, words] of fixtures) parts.push(`${(DEVICE[vp] ?? vp).toLowerCase()} with ${orList(words)}`);
-    if (widths.length) {
-      const runs: number[][] = [];
-      for (const w of widths) {
-        const last = runs[runs.length - 1];
-        if (last && sweepWidths.indexOf(w) === sweepWidths.indexOf(last[last.length - 1]) + 1) last.push(w);
-        else runs.push([w]);
-      }
-      parts.push(`at ${widths.length === 1 ? 'width' : 'widths'} ${andList(runs.map((r) => (r.length === 1 ? `${r[0]}` : `${r[0]}–${r[r.length - 1]}`)))} px`);
-    }
-    return parts.join('; ');
+    for (const id of stateIds) if (id !== null) statesWithFindings.add(id);
+    return places.where(stateIds);
   };
 
   const resultId = (r: DiagnosticResult) => `${r.kind === 'deterministic' ? 'C' : 'O'}-${r.diagId}${r.stateId ? `-${r.stateId}` : ''}`;
@@ -487,6 +526,13 @@ export function buildFindingsEvidence(
       const hidden = [...new Set((byElement ? it.elements.slice(1) : it.elements).map((e) => norm(e.selector)))].sort();
       return `${byElement ? norm(it.elements[0]?.selector ?? '') : it.data.obstruction}:${it.data.pinned}:${hidden.join(',')}`;
     },
+    broken_images: ({ it }) => norm(it.elements[0]?.selector ?? ''),
+    proximity_inversion: ({ it }) => `${it.data.level ?? 'groups'}:${norm(it.elements[0]?.selector ?? '', false)}`,
+  };
+  const groupRoot = (it: DiagnosticItem) => {
+    const root = it.elements[0];
+    const legend = it.elements.find((e) => e.tag === 'legend' && e.name);
+    return root ? one(namedFromSelector(root.selector, cleanLabel(root.name) ?? labelIn(it.summary, root.selector) ?? cleanLabel(legend?.name), root.componentId)) : 'a group';
   };
   const direction = (axis: unknown) => (axis === 'y' ? 'vertically' : 'horizontally');
 
@@ -571,6 +617,20 @@ export function buildFindingsEvidence(
         count > 1 ? `up to ${pct(Math.max(...fractions))} of each` : `${span(fractions, pct)} of it`
       } is never visible.`;
     },
+    broken_images: (g) => {
+      const els = elementsOf(g, (it) => it.elements.slice(0, 1));
+      const pl = isPlural(els, instances(g));
+      return `${capital(names(els, instances(g)))} failed to load and ${pl ? 'draw' : 'draws'} as ${pl ? 'broken-image boxes' : 'a broken-image box'}.`;
+    },
+    proximity_inversion: (g) => {
+      const it = g.entries[0].it;
+      const n = Math.max(...nums(g, 'groups'));
+      const between = span(nums(g, 'betweenMedianPx'), px);
+      const within = span(nums(g, 'withinMedianPx'), px);
+      return it.data.level === 'items'
+        ? `The ${n} items of ${groupRoot(it)} are ${between} px apart while the parts inside each item are ${within} px apart, so each item's parts sit closer to the next item than to each other.`
+        : `The ${n} groups in ${groupRoot(it)} are ${between} px apart while the items inside each group are ${within} px apart, so the groups do not read as separate.`;
+    },
   };
 
   const secondaryText = (kind: string, it: DiagnosticItem): string => {
@@ -641,8 +701,16 @@ export function buildFindingsEvidence(
 
   const spatialGrouping = (): FindingLine[] => {
     const isRelation = (it: DiagnosticItem) => typeof it.data.ratio === 'number' && it.data.gapPx === undefined && it.data.side === undefined;
+    // Items with no gap inside them have no ratio; they still matter when the items nearly touch.
+    const isUnspacedItems = (it: DiagnosticItem) =>
+      it.data.level === 'items' && it.data.ratio === null && typeof it.data.betweenMedianPx === 'number' && (it.data.betweenMedianPx as number) < C.clearancePx;
+    // Relations Proximity Inversion reports as failures are not repeated here.
+    const relationKey = (r: DiagnosticResult, it: DiagnosticItem) => `${r.stateId}|${it.elements[0]?.selector}|${it.data.level ?? 'groups'}`;
+    const inverted = new Set(
+      added ? results.filter((r) => r.diagId === 'proximity_inversion' && r.status === 'fail').flatMap((r) => r.items.map((it) => relationKey(r, it))) : [],
+    );
     const relations = groupBy(
-      entriesOf('spatial_grouping', (it) => isRelation(it) && (it.data.ratio as number) < C.groupingRatio),
+      entriesOf('spatial_grouping', (it) => (isRelation(it) && (it.data.ratio as number) < C.groupingRatio) || isUnspacedItems(it)).filter((e) => !inverted.has(relationKey(e.r, e.it))),
       ({ it }) => `${it.data.level ?? 'groups'}:${norm(it.elements[0]?.selector ?? '', false)}`,
     );
     const relationText = (g: Group) => {
@@ -660,8 +728,14 @@ export function buildFindingsEvidence(
         return new Set(vals).size === 1 ? vals[0] : andList(vals.map((v, i) => `${v} on ${shortName(perState[i].r.stateId)}`));
       };
       const between = value('betweenMedianPx', (v) => `${px(v)} px`);
+      if (perState.every((e) => e.it.data.ratio === null)) {
+        return `The ${n} items of ${rootName}: ${between} between neighbouring items and no gap between the parts inside each item (reference ~12 px between items).`;
+      }
       const within = value('withinMedianPx', (v) => `${px(v)} px`);
-      const r = value('ratio', ratio);
+      const unspaced = perState.filter((e) => e.it.data.ratio === null);
+      const r = unspaced.length
+        ? `${andList(perState.filter((e) => e.it.data.ratio !== null).map((e) => `${ratio(e.it.data.ratio as number)} on ${shortName(e.r.stateId)}`))}; none on ${andList(unspaced.map((e) => shortName(e.r.stateId)))}, which have no gap inside items`
+        : value('ratio', ratio);
       return it.data.level === 'items'
         ? `The ${n} items of ${rootName}: ${between} between neighbouring items; ${within} between the parts inside each item (ratio ${r}; reference ~2×).`
         : `The ${n} groups in ${rootName}: ${within} inside each group; ${between} between groups (ratio ${r}; reference ~2×).`;
@@ -779,6 +853,44 @@ export function buildFindingsEvidence(
     return out;
   };
 
+  const mediaFit = (): FindingLine[] => {
+    const all = entriesOf('media_fit', (it) => typeof it.data.shown === 'number');
+    const pictureKey = ({ it }: Entry) => norm(it.elements[0]?.selector ?? '');
+    const cropped = (it: DiagnosticItem) => !it.data.decorative && (it.data.shown as number) < C.mediaShown;
+    const distortion = (it: DiagnosticItem) => it.data.distortion as number;
+    const pictures = (g: Group) => {
+      const els = g.entries.map(({ it }) => pictureNamed(it.elements[0], it.data.source));
+      return { text: names(els, instances(g)), pl: isPlural(els, instances(g)) };
+    };
+    const crops = groupBy(all.filter((e) => cropped(e.it)), (e) => pictureKey(e));
+    const cropText = (g: Group) => {
+      const { text, pl } = pictures(g);
+      const sides = (['top', 'bottom', 'left', 'right'] as const).filter((s) => g.entries.some(({ it }) => (it.data.cut as Record<string, number>)[s] >= 0.02));
+      const how =
+        g.entries[0].it.data.fit === 'cover'
+          ? `scaled to fill ${pl ? 'boxes' : 'a box'} with an aspect ratio of ${span(nums(g, 'boxAspect'), px1)}`
+          : `drawn larger than ${pl ? 'their boxes' : 'its box'} (aspect ratio ${span(nums(g, 'boxAspect'), px1)})`;
+      const rest = all.filter((e) => pictureKey(e) === g.key && !cropped(e.it)).map((e) => e.it.data.shown as number);
+      const elsewhere = rest.length
+        ? ` In the other states and widths measured, ${pl ? 'they show' : 'it shows'} ${Math.min(...rest) >= 0.995 ? 'the whole picture' : `${span(rest, pct)} of ${pl ? 'each' : 'the'} picture`}.`
+        : '';
+      return `${capital(text)} ${pl ? 'show' : 'shows'} ${span(nums(g, 'shown'), pct)} of ${pl ? 'each' : 'the'} picture: ${pl ? 'they are' : 'it is'} ${how}, while ${pl ? "the pictures'" : "the picture's"} own is ${span(nums(g, 'naturalAspect'), px1)}, so the ${andList(sides)} ${sides.length > 1 ? 'are' : 'is'} cut off.${elsewhere}`;
+    };
+    const stretched = groupBy(
+      all.filter((e) => Math.abs(distortion(e.it)) >= C.mediaDistortion),
+      (e) => `${pictureKey(e)}:${Math.sign(distortion(e.it))}`,
+    );
+    const stretchText = (g: Group) => {
+      const { text, pl } = pictures(g);
+      const d = nums(g, 'distortion');
+      const wider = d[0] > 0;
+      return `${capital(text)} ${pl ? 'are' : 'is'} distorted: drawn at an aspect ratio of ${span(nums(g, 'drawnAspect'), px1)} instead of ${pl ? 'their' : 'its'} natural ${span(nums(g, 'naturalAspect'), px1)}, ${
+        wider ? 'stretched' : 'squeezed'
+      } ${span(d.map(Math.abs), pct)} ${wider ? 'wider' : 'narrower'}.`;
+    };
+    return [...lines(crops, cropText), ...lines(stretched, stretchText)];
+  };
+
   const layoutStability = (): FindingLine[] =>
     observed('layout_stability')
       .filter((r) => Number(r.data?.shiftCount ?? 0) > 0)
@@ -794,11 +906,30 @@ export function buildFindingsEvidence(
         return line({ key: '', entries: r.items.map((it) => ({ r, it })) }, text);
       });
 
+  // The measurements Layout v7 added: each flagged item is a line, merged across states by the
+  // elements it is about. Truncation in a state where Container Overflow failed is already listed
+  // under that check.
+  const flaggedLines = (diagId: string, keep: (e: Entry) => boolean = () => true) =>
+    lines(
+      groupBy(entriesOf(diagId, (it) => !!it.data.flagged).filter(keep), ({ it }) => (it.elements.length ? it.elements.map((e) => norm(e.selector)).join('|') : it.summary)),
+      (g) => {
+        const t = g.entries[0].it.summary.trim();
+        return /[.!?]$/.test(t) ? t : `${t}.`;
+      },
+    );
+  const overflowFailed = new Set(results.filter((r) => r.diagId === 'container_overflow' && r.status === 'fail').map((r) => r.stateId));
+
   const observationLines: Record<string, () => FindingLine[]> = {
     spatial_grouping: spatialGrouping,
     alignment_outliers: alignmentOutliers,
+    media_fit: mediaFit,
     responsive_adaptation: responsiveAdaptation,
     layout_stability: layoutStability,
+    text_truncation: () => flaggedLines('text_truncation', (e) => !overflowFailed.has(e.r.stateId)),
+    row_imbalance: () => flaggedLines('row_imbalance'),
+    hidden_scroll_items: () => flaggedLines('hidden_scroll_items'),
+    pinned_over_used: () => flaggedLines('pinned_over_used'),
+    viewport_parity: () => flaggedLines('viewport_parity'),
   };
 
   const observationBlock = (diagId: string): ObservationBlock | null => {
@@ -813,8 +944,8 @@ export function buildFindingsEvidence(
     return {
       criterion: c.id,
       name: c.name,
-      checks: CHECK_ORDER.filter(home).map(checkBlock).filter((b): b is CheckBlock => b !== null),
-      observations: OBSERVATION_ORDER.filter(home).map(observationBlock).filter((b): b is ObservationBlock => b !== null),
+      checks: [...CHECK_ORDER, ...(added ? ADDED_CHECK_ORDER : [])].filter(home).map(checkBlock).filter((b): b is CheckBlock => b !== null),
+      observations: [...OBSERVATION_ORDER, ...(added ? ADDED_OBSERVATION_ORDER : [])].filter(home).map(observationBlock).filter((b): b is ObservationBlock => b !== null),
     };
   });
 

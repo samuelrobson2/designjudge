@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll('.save[aria-label]').forEach((b) => { b.removeAttribute('aria-label'); b.textContent = ''; b.style.backgroundImage = 'radial-gradient(circle, #e11d48 30%, transparent 32%)'; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true });",
+  "case": "carsearch-baseline",
+  "id": "save-buttons-unnamed",
+  "kind": "defect",
+  "title": "Save buttons lose their accessible names",
+  "symptom": "The heart-shaped Save buttons on the car cards lose their aria-label, so a screen reader announces each one as \"button\" with no name.",
+  "where": {},
+  "severity": "moderate"
+}

@@ -1,0 +1,13 @@
+{
+  "description": "First Typography prompt: Layout v6's structure (fixed system prompt, findings evidence under each criterion) with type specimen sheets and whole typography profiles rather than only out-of-range values.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

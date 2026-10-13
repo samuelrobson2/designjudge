@@ -1,0 +1,11 @@
+{
+  "id": "inverted-heading-hierarchy",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Section headings larger than the page title",
+  "symptom": "Section headings are 28 px while the page title is 18 px, so subordinate headings overpower the title.",
+  "where": {},
+  "severity": "moderate",
+  "css": ".page__intro h1 { font-size: 18px !important; }\n.form-section__head h2, .summary__card h2 { font-size: 28px !important; }",
+  "js": null
+}

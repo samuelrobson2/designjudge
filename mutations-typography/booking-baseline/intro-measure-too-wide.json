@@ -1,0 +1,15 @@
+{
+  "id": "intro-measure-too-wide",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Intro text runs the full page width",
+  "symptom": "The intro paragraph loses its max-width and gets two more sentences, so on wide screens its lines run to about 1,500 px.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "minor",
+  "css": ".page { max-width: none !important; }\n.page__intro { max-width: none !important; }",
+  "js": "const lede = document.querySelector('.lede');\nif (lede) lede.textContent += ' Our physiotherapists see adults of every age and activity level, from desk workers with stiff backs to runners recovering from injury. If you are not sure which appointment suits you, choose an initial assessment and we will plan the rest of your care together at your first visit.';"
+}

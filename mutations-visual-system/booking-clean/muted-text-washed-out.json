@@ -1,0 +1,11 @@
+{
+  "css": ":root { --muted: #a3aab4; }",
+  "js": null,
+  "case": "booking-clean",
+  "id": "muted-text-washed-out",
+  "kind": "defect",
+  "title": "Secondary text washed out to a pale grey",
+  "symptom": "The muted text colour is lightened to #a3aab4, so the treatment durations and descriptions, the section hints, the date-picker range and the summary labels read at about 2.4:1 against white.",
+  "where": {},
+  "severity": "moderate"
+}

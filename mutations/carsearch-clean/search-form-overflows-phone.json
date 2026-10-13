@@ -1,0 +1,20 @@
+{
+  "id": "search-form-overflows-phone",
+  "case": "carsearch-clean",
+  "kind": "defect",
+  "title": "Postcode search runs off the side of phone screens",
+  "symptom": "Below 768 px the postcode field, distance menu and Search button stay on one row at their desktop widths, so on a phone the Search button lies beyond the right edge and the page scrolls sideways.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ],
+    "interaction": null
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .location { display: flex !important; flex-wrap: nowrap; }\n  .location__field, .location .btn { flex: none; }\n  #postcode { width: 150px !important; }\n  #distance { width: 190px !important; }\n}",
+  "js": null
+}

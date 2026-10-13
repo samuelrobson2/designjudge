@@ -1,0 +1,15 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll('.nav__item').forEach((a) => {\n  const label = a.textContent.trim();\n  const emoji = { Orders: '📦', Settings: '⚙️' }[label];\n  const svg = a.querySelector('svg');\n  if (emoji && svg) { const s = document.createElement('span'); s.className = 'icon'; s.textContent = emoji; svg.replaceWith(s); }\n}); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true });",
+  "case": "dashboard-baseline",
+  "id": "nav-icons-mixed-with-emoji",
+  "kind": "defect",
+  "title": "Two navigation icons replaced with emoji",
+  "symptom": "The Orders and Settings items in the sidebar show emoji (📦, ⚙️) where the other items show line icons, mixing two icon styles in one list.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "minor"
+}

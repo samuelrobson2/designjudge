@@ -1,0 +1,11 @@
+{
+  "id": "size-sprawl",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Many near-identical font sizes",
+  "symptom": "Card names, prices, details, slots, chips and summary rows each get a slightly different size (12.5–16.5 px), so the scale has no clear steps.",
+  "where": {},
+  "severity": "minor",
+  "css": ".option-card__name { font-size: 15.5px !important; }\n.option-card__price { font-size: 16.5px !important; }\n.option-card__meta { font-size: 13.5px !important; }\n.slot { font-size: 14.5px !important; }\n.chip { font-size: 13px !important; }\n.summary__row dt { font-size: 12.5px !important; }\n.summary__row dd { font-size: 14.2px !important; }\n.field label { font-size: 15.2px !important; }",
+  "js": null
+}

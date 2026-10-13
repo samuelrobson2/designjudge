@@ -1,0 +1,19 @@
+{
+  "css": "@media (max-width: 767px) {\n  .date-strip { gap: 2px !important; }\n  .date-chip { flex: 0 0 20px !important; width: 20px !important; min-width: 0 !important; height: 20px; min-height: 0; padding: 0 !important; overflow: hidden; font-size: 9px; }\n  .date-chip__num { font-size: 10px; }\n  .date-chip__day, .date-chip__month { display: none; }\n}",
+  "js": null,
+  "case": "booking-baseline",
+  "id": "date-chips-tiny-phone",
+  "kind": "defect",
+  "title": "Date chips shrink to tiny tap targets on phones",
+  "symptom": "On phones the date picker becomes a row of 20 × 20 px chips 2 px apart, too small and too close together to tap reliably.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ]
+  },
+  "severity": "moderate"
+}

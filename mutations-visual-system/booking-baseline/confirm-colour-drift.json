@@ -1,0 +1,16 @@
+{
+  "css": ".summary .btn--primary { background: #12786f; }",
+  "js": null,
+  "case": "booking-baseline",
+  "id": "confirm-colour-drift",
+  "kind": "defect",
+  "title": "Summary Confirm button in a hard-coded near-match of the brand colour",
+  "symptom": "The summary panel's Confirm button is given a hard-coded #12786f instead of the brand variable, a shade that almost but not quite matches every other primary element.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet"
+    ]
+  },
+  "severity": "minor"
+}

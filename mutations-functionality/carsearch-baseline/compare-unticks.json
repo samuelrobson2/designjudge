@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('change', (e) => { if (e.target.matches && e.target.matches('[data-compare]')) { e.stopImmediatePropagation(); e.target.checked = false; } }, true);",
+  "case": "carsearch-baseline",
+  "id": "compare-unticks",
+  "kind": "defect",
+  "title": "Compare boxes untick themselves",
+  "symptom": "Ticking \"Compare\" on a car unticks it again straight away, so cars can never be added to the comparison.",
+  "where": {},
+  "severity": "moderate"
+}

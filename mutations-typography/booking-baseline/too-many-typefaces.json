@@ -1,0 +1,11 @@
+{
+  "id": "too-many-typefaces",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Four unrelated typefaces",
+  "symptom": "Section headings, treatment names, the summary and the intro each use a different typeface (Georgia, Courier New, Times New Roman, Verdana).",
+  "where": {},
+  "severity": "moderate",
+  "css": ".form-section__head h2 { font-family: Georgia, serif !important; }\n.option-card__name { font-family: 'Courier New', monospace !important; }\n.summary__card { font-family: 'Times New Roman', serif !important; }\n.lede { font-family: Verdana, sans-serif !important; }",
+  "js": null
+}

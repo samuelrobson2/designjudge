@@ -5,11 +5,32 @@ Each JSON file in `mutations/<case-id>/` is one self-contained change to a basel
 - booking-baseline: 14 defects, 4 harmless
 - dashboard-baseline: 14 defects, 4 harmless
 - carsearch-baseline: 13 defects, 4 harmless
+- booking-clean: 3 defects, 1 harmless
+- carsearch-clean: 3 defects, 1 harmless
+- dashboard-clean: 3 defects, 1 harmless
 
 Tools:
 
 - `_tools/build-items.mjs` regenerates all item files and this README.
 - `_tools/preview.mjs <case> <item-id|baseline|all> [--vp=..] [--fixture=..] [--base]` serves the case, applies the item and writes screenshots to `_previews/<case>/`.
+
+## Clean bases
+
+The `*-clean` folders plant defects into the clean controls (`cases/*-clean`), which have no material weakness in any category. Each defect is a material Layout weakness, so a sound judge scores the variant below its clean base; each harmless change should leave the Layout score unchanged. `mutations-typography/`, `mutations-task-fit/` and `mutations-content-quality/` have clean-base folders built the same way for their own categories.
+
+## Judging planted variants
+
+`--judge` collects as usual, then judges the clean control and every variant for real, in the folder's category (Layout for `mutations/`, otherwise the one in the folder name; `--category` overrides). With `--rescore <runId>` it judges a previous run's evidence without collecting again:
+
+```
+npm run mutate -- booking-clean carsearch-clean dashboard-clean --judge
+npm run mutate -- booking-clean carsearch-clean dashboard-clean --dir mutations-typography --judge
+npm run mutate -- --rescore <runId> --dir mutations-typography --judge
+```
+
+Each control is judged 5 times (`--base-repeats`) and each variant 3 times (`--repeats`); `--provider`, `--model`, `--effort` and `--prompt` are as for `npm run judge`, and `--provider mock` checks the harness for free. The expected direction comes from the file name alone: a `harmless-*` variant should score the same as its control (means within half a point, compare's `no_change`), a `minor-*` defect, which the judges consistently find minor, should not score more than half a point higher (`no_rise`), and anything else lower (compare's `must_drop`: a lower mean, with at least 80% of control × variant score pairs not higher). A miss with fewer than 3 valid scores on either side reads "needs more repeats".
+
+The judge sees what any interface's judge sees: the base case's request and an opaque interface ID. Before any call, every prompt is checked for the case name and the variant's file name, title and symptom. Results go to `artifacts/mutations/<runId>/judge/<judge run>/` (`report.json`, the requests and judgments), not `artifacts/runs/`, so variants never appear in the viewer or on the rating site.
 
 | Case | Id | Kind | Severity | Where | Title |
 | --- | --- | --- | --- | --- | --- |
@@ -66,3 +87,15 @@ Tools:
 | carsearch-baseline | harmless-deal-badge-on-image | harmless | none | desktop/tablet/phone | Deal badge overlaid on the car photo |
 | carsearch-baseline | harmless-trim-ellipsis | harmless | none | desktop/tablet/phone; stress | Trim line truncated with an ellipsis |
 | carsearch-baseline | harmless-chips-scroller-phone | harmless | none | phone; 320–767 px; after: Apply several filters | Active filter chips scroll sideways on phones |
+| booking-clean | date-strip-overflows-phone | defect | severe | phone; 320–639 px | Dates and times run off the side of phone screens |
+| booking-clean | treatment-list-clipped | defect | severe | desktop/tablet/phone | Treatment list cut off after two options |
+| booking-clean | grouping-inverted | defect | moderate | desktop/tablet/phone | Headings and labels sit closer to the previous item than to their own |
+| booking-clean | harmless-roomier-form | harmless | none | desktop; 1024–1920 px | More room inside the form on wide screens |
+| carsearch-clean | prices-and-ratings-cut-off | defect | severe | desktop/tablet/phone | Prices and price ratings cut off on every car |
+| carsearch-clean | results-overlap-filters | defect | severe | desktop; 1024–1920 px | Results slide over the filter panel on desktop |
+| carsearch-clean | search-form-overflows-phone | defect | moderate | phone; 320–767 px | Postcode search runs off the side of phone screens |
+| carsearch-clean | harmless-card-padding | harmless | none | desktop/tablet/phone | More padding inside the car cards |
+| dashboard-clean | minor-product-rows-misgrouped | defect | minor | desktop/tablet/phone | Top products' bars and sales sit closer to the next product than to their own |
+| dashboard-clean | revenue-chart-squashed | defect | severe | desktop/tablet/phone | Revenue chart squashed into a thin strip |
+| dashboard-clean | orders-table-clipped-narrow | defect | severe | tablet/phone; 320–1023 px | Orders table cut off on tablets and phones |
+| dashboard-clean | harmless-roomier-cards | harmless | none | desktop; 1024–1920 px | More space between and inside the cards on wide screens |

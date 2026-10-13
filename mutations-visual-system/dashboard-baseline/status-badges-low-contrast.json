@@ -1,0 +1,11 @@
+{
+  "css": ".status--paid { color: #93d3ab !important; } .status--pending { color: #f2c27c !important; }",
+  "js": null,
+  "case": "dashboard-baseline",
+  "id": "status-badges-low-contrast",
+  "kind": "defect",
+  "title": "Order status badges in pale text",
+  "symptom": "The \"Paid\" and \"Pending\" status badges are recoloured to pale green and pale amber text on their tints, about 1.7:1, so order status is hard to read.",
+  "where": {},
+  "severity": "moderate"
+}

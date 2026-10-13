@@ -1,0 +1,11 @@
+{
+  "id": "light-small-text",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Small text set in a light weight",
+  "symptom": "Body copy and treatment descriptions are set at weight 300 and 200, thin and low-contrast at 14–16 px.",
+  "where": {},
+  "severity": "moderate",
+  "css": "body, p, .lede { font-weight: 300 !important; }\n.option-card__desc { font-weight: 200 !important; }",
+  "js": null
+}

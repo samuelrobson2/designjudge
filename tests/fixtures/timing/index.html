@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timing fixture</title>
+<!-- Everything here happens after a delay: the collector must capture the same outcome on a fast
+     and a slow machine. /slow?ms=N answers after N ms of real time. -->
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font: 16px/1.4 system-ui, sans-serif; color: #111; }
+  header { padding: 16px 24px; border-bottom: 1px solid #ddd; }
+  main { padding: 24px; display: grid; gap: 12px; grid-template-columns: repeat(4, max-content); }
+  button, a.btn { font: inherit; padding: 8px 14px; border: 1px solid #555; border-radius: 6px; background: #fff; color: #111; text-decoration: none; }
+  button:focus-visible, a.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px #2563eb; transition: box-shadow 400ms ease; }
+  button[aria-pressed] { transition: background-color 300ms ease, color 300ms ease; }
+  button[aria-pressed="true"] { background: #1e3a8a; color: #fff; }
+  .panel { grid-column: 1 / -1; height: 260px; background: #eef; border: 1px solid #99c; }
+  .fade { opacity: 0; transition: opacity 600ms ease; }
+  .fade.on { opacity: 1; }
+  .menu { position: fixed; top: 0; right: 0; width: 360px; height: 100vh; background: #fff; border-left: 1px solid #999; transform: translateX(100%); transition: transform 450ms ease; }
+  .menu.open { transform: none; }
+  .banner { background: #fff4dc; padding: 18px 24px; font-weight: 600; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .live { animation: pulse 1.2s ease-in-out infinite; color: #555; }
+  #far { margin-top: 2400px; padding: 24px; }
+</style>
+</head>
+<body>
+<header><strong>Timing fixture</strong> <span class="live" id="live">Live</span></header>
+<main>
+  <button id="t150" type="button">Show after 150 ms</button>
+  <button id="t350" type="button">Show after 350 ms</button>
+  <button id="t700" type="button">Show after 700 ms</button>
+  <button id="fetch" type="button">Load from slow server</button>
+  <button id="fade" type="button">Fade in</button>
+  <button id="slide" type="button" aria-expanded="false" aria-controls="menu">Open menu</button>
+  <button id="pin" type="button" aria-pressed="false">Pin</button>
+  <a class="btn" id="jump" href="#far">Jump to the end</a>
+  <label>Postcode <input id="debounced" name="postcode"></label>
+  <section id="out" aria-live="polite"></section>
+</main>
+<nav class="menu" id="menu" aria-label="Menu"><p style="padding:24px">Menu contents</p><button id="close-menu" type="button">Close</button></nav>
+<div id="far"><p>The end of the page.</p></div>
+<script>
+  const out = document.getElementById('out');
+  const panel = (text, cls = '') => { const d = document.createElement('div'); d.className = 'panel ' + cls; d.textContent = text; out.replaceChildren(d); return d; };
+  for (const ms of [150, 350, 700]) document.getElementById('t' + ms).addEventListener('click', () => setTimeout(() => panel('Shown after ' + ms + ' ms'), ms));
+  document.getElementById('fetch').addEventListener('click', async () => { const r = await fetch('/slow?ms=450'); panel(await r.text()); });
+  document.getElementById('fade').addEventListener('click', () => { const d = panel('Faded in', 'fade'); requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add('on'))); });
+  const menu = document.getElementById('menu');
+  document.getElementById('slide').addEventListener('click', (e) => { menu.classList.add('open'); e.currentTarget.setAttribute('aria-expanded', 'true'); });
+  document.getElementById('close-menu').addEventListener('click', () => { menu.classList.remove('open'); document.getElementById('slide').setAttribute('aria-expanded', 'false'); });
+  document.getElementById('pin').addEventListener('click', (e) => setTimeout(() => e.target.setAttribute('aria-pressed', String(e.target.getAttribute('aria-pressed') !== 'true')), 200));
+  let timer = null;
+  document.getElementById('debounced').addEventListener('input', (e) => { clearTimeout(timer); const el = e.target; timer = setTimeout(() => { el.value = el.value.toUpperCase().slice(0, 4); }, 350); });
+  setTimeout(() => { const b = document.createElement('div'); b.className = 'banner'; b.textContent = 'New: evening appointments on Thursdays.'; document.querySelector('header').after(b); }, 1200);
+</script>
+</body>
+</html>

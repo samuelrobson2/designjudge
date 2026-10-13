@@ -38,6 +38,7 @@ export async function render(
     await page.evaluate(await initScript(null));
     await page.evaluate(await snapshotScript());
     if (opts.script) await page.evaluate(opts.script);
+    await page.evaluate('window.__djBackgroundSizes()');
     const snap = (await page.evaluate('window.__djSnapshot(8000)')) as Snapshot;
     if (opts.occlusion) snap.occlusion = (await page.evaluate(`window.__djOcclusion(${JSON.stringify(opts.insets ?? null)})`)) as Snapshot['occlusion'];
     return { snap, doc: new Doc(snap), ctx: { stateId: 'test', viewport: { width, height } } };

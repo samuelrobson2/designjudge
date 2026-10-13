@@ -1,0 +1,13 @@
+{
+  "description": "First Visual System prompt: Typography v1's structure (fixed system prompt, findings evidence under each criterion, flagged-only measurements) with controls-in-each-state sheets, a palette sheet and a colour-vision view.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}
