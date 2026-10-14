@@ -82,6 +82,13 @@ describe('Viewer home page', () => {
       expect(shown.counts, cat.id).toEqual(['9', String(ownRuns.length), ...(robust.rows.length ? [String(robust.rows.length)] : [])]);
       // Robustness tests come last, below the judge runs.
       expect((await page.locator('.section-title h1, .section-title h2').allTextContents()).slice(-2), cat.id).toEqual(['Judge runs', 'Robustness tests']);
+      // They start folded, with their result in view, and open on a click.
+      if (robust.rows.length) {
+        await expect.poll(() => page.locator('table.robust').isVisible(), cat.id).toBe(false);
+        expect(await page.locator('.robust-wrap > summary .robust__summary').isVisible(), cat.id).toBe(true);
+        await page.locator('.robust-wrap > summary').click();
+        expect(await page.locator('table.robust').isVisible(), cat.id).toBe(true);
+      }
     }
     expect(errors).toEqual([]);
   });

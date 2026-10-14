@@ -368,6 +368,12 @@ td > .case-id { display: block; margin-top: 2px; }
 .case-cell__name { font-weight: 600; }
 .case-description { font-size: 15px; }
 
+.robust-wrap > summary { cursor: pointer; list-style: none; }
+.robust-wrap > summary::-webkit-details-marker { display: none; }
+.robust-wrap > summary .section-title::before { content: ''; width: 8px; height: 8px; margin-right: 4px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); align-self: center; transition: transform 0.15s; }
+.robust-wrap[open] > summary .section-title::before { transform: rotate(45deg); }
+.robust-wrap > summary:hover .section-title::before { border-color: var(--text); }
+.robust-wrap:not([open]) > summary .section-title { margin-bottom: 0; }
 .robust__intro { max-width: 820px; margin: 0 0 4px; }
 .robust__summary { white-space: nowrap; }
 .robust td { font-size: 14px; }

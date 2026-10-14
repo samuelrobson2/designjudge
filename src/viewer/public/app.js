@@ -651,13 +651,15 @@ function robustnessSection(data, cat) {
   const fmt = (x) => (x === null || x === undefined ? '—' : Number(x).toFixed(2).replace(/\.?0+$/, ''));
   const scores = (xs, mean) => h('span', {}, h('strong', {}, fmt(mean)), h('span', { class: 'faint small' }, ` (${xs.map((x) => x ?? '×').join(' ')})`));
   const r = data.judgeRun;
-  return [
-    head,
+  head.append(h('span', { class: 'robust__summary small muted' }, `${data.counts.asExpected} of ${data.counts.total} as expected.`));
+  return h(
+    'details',
+    { class: 'robust-wrap' },
+    h('summary', {}, head),
     h(
       'p',
       { class: 'robust__intro' },
-      `Each test plants one ${cat.name} problem in a Best interface (or, for “harmless” tests, a change that should not matter) and checks the judge's score moves the right way against the unchanged interface. `,
-      h('strong', { class: 'robust__summary' }, `${data.counts.asExpected} of ${data.counts.total} as expected.`),
+      `Each test plants one ${cat.name} problem in a Best interface (or, for “harmless” tests, a change that should not matter) and checks the judge's score moves the right way against the unchanged interface.`,
     ),
     h('p', { class: 'meta' }, `Judged ${r.model}, effort ${r.effort}, prompt ${r.promptVersion} · run ${r.judgeRunId}`),
     h(
@@ -685,7 +687,7 @@ function robustnessSection(data, cat) {
         ),
       ),
     ),
-  ];
+  );
 }
 
 // ---------- Interface ----------
