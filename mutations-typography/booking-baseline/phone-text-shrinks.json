@@ -1,0 +1,19 @@
+{
+  "id": "phone-text-shrinks",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Text shrinks to 10 px on phones",
+  "symptom": "Below 768 px the intro, descriptions, labels, slots and summary rows shrink to 10 px to fit.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      767
+    ]
+  },
+  "severity": "moderate",
+  "css": "@media (max-width: 767px) {\n  .lede, .option-card__desc, .option-card__meta, .field label, .slot, .summary__row, .summary__note { font-size: 10px !important; }\n}",
+  "js": null
+}

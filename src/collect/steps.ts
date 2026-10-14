@@ -1,38 +1,69 @@
-import type { Page } from 'playwright';
+import type { Locator, Page } from 'playwright';
+import { QUIESCE } from '../config.ts';
 import type { Step } from '../types.ts';
-import { waitForSettled } from './settle.ts';
+import { quiesce, quietCall } from './settle.ts';
 
-const STEP_TIMEOUT = 5000;
+const STEP_TIMEOUT = QUIESCE.actionTimeoutMs;
 
 export interface StepOutcome {
   via: 'pointer' | 'dispatch' | 'keyboard' | 'none';
   note?: string;
 }
 
+// Evidence text names no wall-clock durations: they differ between machines.
+export function withoutDurations(text: string): string {
+  return text.replace(/Timeout \d+ms exceeded/g, 'Timeout exceeded');
+}
+
 // The call-log line that says why the action could not proceed.
-function callLogReason(err: unknown): string {
+export function callLogReason(err: unknown): string {
   const lines = String((err as Error).message).split('\n').map((l) => l.trim().replace(/^-\s*/, ''));
   const cause = [...lines]
     .reverse()
-    .find((l) => /intercepts pointer events|not visible|outside of the viewport|not stable|not enabled|detached|not attached/.test(l));
-  return cause ?? lines[0];
+    .find((l) => /intercepts pointer events|not visible|outside of the viewport|not stable|not enabled|detached|not attached|not editable/.test(l));
+  return withoutDurations(cause ?? lines[0]);
+}
+
+// Why a pointer click on the element cannot land, or null when it can. Decided on the quiet page in
+// one pass (the alignments Playwright retries with included), so the outcome does not depend on
+// how long Playwright would keep retrying.
+export async function pointerBlocked(page: Page, selector: string): Promise<string | null> {
+  try {
+    return await quietCall<string | null>(page, '__djHitCheck', selector);
+  } catch {
+    return null;
+  }
+}
+
+// A real pointer click where one can land, otherwise a dispatched click. Returns why the pointer
+// could not be used, or null.
+export async function clickOrDispatch(page: Page, loc: Locator, selector: string): Promise<string | null> {
+  const blocked = await pointerBlocked(page, selector);
+  if (!blocked) {
+    try {
+      await loc.click({ timeout: STEP_TIMEOUT });
+      return null;
+    } catch (err) {
+      await loc.dispatchEvent('click', undefined, { timeout: STEP_TIMEOUT });
+      return callLogReason(err);
+    }
+  }
+  await loc.dispatchEvent('click', undefined, { timeout: STEP_TIMEOUT });
+  return blocked;
 }
 
 export async function runStep(page: Page, step: Step): Promise<StepOutcome> {
   let outcome: StepOutcome = { via: 'pointer' };
   switch (step.action) {
     case 'click': {
-      const loc = page.locator(step.selector).first();
-      try {
-        await loc.click({ timeout: STEP_TIMEOUT });
-      } catch (err) {
-        // The state is still worth capturing when a real pointer click cannot land (for example,
-        // when overflowing content makes another element intercept the pointer). The fallback is
-        // recorded so the step log shows the control was not hittable.
-        await loc.dispatchEvent('click', undefined, { timeout: STEP_TIMEOUT });
+      // The state is still worth capturing when a real pointer click cannot land (for example,
+      // when overflowing content makes another element intercept the pointer). The fallback is
+      // recorded so the step log shows the control was not hittable.
+      const reason = await clickOrDispatch(page, page.locator(step.selector).first(), step.selector);
+      if (reason) {
         outcome = {
           via: 'dispatch',
-          note: `A pointer click on ${step.selector} could not land at its on-screen position (${callLogReason(err)}), so the click was dispatched programmatically to reach this state.`,
+          note: `A pointer click on ${step.selector} could not land at its on-screen position (${reason}), so the click was dispatched programmatically to reach this state.`,
         };
       }
       break;
@@ -66,14 +97,28 @@ export async function runStep(page: Page, step: Step): Promise<StepOutcome> {
       outcome = { via: 'none' };
       break;
     case 'wait':
-      await page.waitForTimeout(step.ms);
+      // A declared wait is page time.
+      await quiesce(page, step.ms);
       outcome = { via: 'none' };
-      break;
+      return outcome;
     case 'waitFor':
-      await page.locator(step.selector).first().waitFor({ state: 'visible', timeout: STEP_TIMEOUT });
+      await waitForVisible(page, step.selector);
       outcome = { via: 'none' };
       break;
   }
-  await waitForSettled(page, null, true);
+  await quiesce(page, 'action');
   return outcome;
+}
+
+// Gives the page action-sized slices of page time until the element shows, up to the action timeout
+// in page time.
+async function waitForVisible(page: Page, selector: string): Promise<void> {
+  const loc = page.locator(selector).first();
+  for (let spent = 0; ; ) {
+    if (await loc.isVisible().catch(() => false)) return;
+    if (spent >= STEP_TIMEOUT) throw new Error(`${selector} did not become visible within ${STEP_TIMEOUT / 1000} s of page time`);
+    const r = await quiesce(page, 'brief');
+    spent += r.pageMs ?? 0;
+    if (!r.pageMs) spent = STEP_TIMEOUT;
+  }
 }

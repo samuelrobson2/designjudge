@@ -1,0 +1,18 @@
+{
+  "id": "harmless-card-padding",
+  "case": "carsearch-clean",
+  "kind": "harmless",
+  "title": "More padding inside the car cards",
+  "symptom": "The text of each car card has 4 px more padding on each side (20 px top, 24 px sides and bottom). The grid and its gaps are unchanged.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": ".car__body { padding: 20px 24px 24px; }",
+  "js": null
+}

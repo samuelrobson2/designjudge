@@ -1,0 +1,18 @@
+{
+  "id": "treatment-list-clipped",
+  "case": "booking-clean",
+  "kind": "defect",
+  "title": "Treatment list cut off after two options",
+  "symptom": "The treatment list is limited to 190 px and clips what does not fit, so only the first two treatments show in full, the third is cut through and the fourth is hidden. Nothing shows that there are more options, and they cannot be scrolled to.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": ".option-list { max-height: 190px; }",
+  "js": null
+}

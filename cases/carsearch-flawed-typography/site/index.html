@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Used cars near Bristol · Motorwise</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .car__title { font-size: 30px !important; font-weight: 800 !important; line-height: 1.15; }
+      .car__price { font-size: 14px !important; font-weight: 400 !important; color: var(--muted); margin-top: 2px; }
+      .car__title { font-family: Georgia, 'Times New Roman', serif; }
+      .car__price { font-family: 'Courier New', Courier, monospace; }
+      .filters, .filters h2, .filters legend { font-family: Verdana, Geneva, sans-serif; }
+      .page__head h1, .page__count { font-family: 'Trebuchet MS', sans-serif; }
+      .deal, .specs { font-family: 'Times New Roman', Times, serif; font-style: italic; }
+      @media (max-width: 767px) {
+        :root { font-size: 11px !important; }
+        .car__trim, .deal, .specs, .car__foot, .check, .check__count, .fgroup .link-btn, .toggle, .chip, .sort { font-size: 11px !important; }
+        .page__count { font-size: 13px !important; }
+        .page__head h1 { font-size: 16px !important; }
+        select, input:not([type='checkbox']):not([type='radio']) { font-size: 11px !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "css": ".option-card:nth-child(3) { border-radius: 2px; border-color: #7b8491; box-shadow: 0 3px 8px rgba(16, 24, 40, 0.18); }",
+  "js": null,
+  "case": "booking-baseline",
+  "id": "odd-treatment-card",
+  "kind": "defect",
+  "title": "One treatment card styled differently from the others",
+  "symptom": "The third treatment card has square corners, a darker border and a drop shadow, while the other three are flat with rounded corners, so it looks like a different kind of element or a promoted option.",
+  "where": {},
+  "severity": "minor"
+}

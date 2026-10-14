@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('submit', (e) => { if (e.target.id !== 'location-form') return; e.preventDefault(); e.stopImmediatePropagation(); throw new TypeError(\"Cannot read properties of undefined (reading 'lat')\"); }, true);",
+  "case": "carsearch-clean",
+  "id": "search-throws",
+  "kind": "defect",
+  "title": "Search fails with a script error and no message",
+  "symptom": "Pressing \"Search\" after changing the postcode or distance raises a script error: the results stay as they were and nothing tells the user that the search failed or what to do.",
+  "where": {},
+  "severity": "moderate"
+}

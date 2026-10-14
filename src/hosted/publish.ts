@@ -2,8 +2,8 @@
 // with `vercel deploy --prebuilt`. The evidence lives only on this machine, so the site is
 // always built here rather than by Vercel from the repo.
 //
-// The site is a snapshot of the local viewer: every judge run, and each interface's latest
-// evidence shown with the latest rating prompt version. Ratings are committed to the GitHub repo by one function (src/hosted/api.ts).
+// The site is a snapshot of the local viewer: every judge run, and the latest evidence of each
+// interface a category lists, shown with each category's latest rating prompt version. Ratings are committed to the GitHub repo by one function (src/hosted/api.ts).
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -17,11 +17,10 @@ import { HUMAN_DIR } from '../human/store.ts';
 import { loadBundle } from '../store.ts';
 import { log } from '../util.ts';
 import { startViewer } from '../viewer/server.ts';
-import type { HostedKit } from './kit.ts';
+import { writeInlinedSite } from './inline.ts';
+import type { HostedKit, HostedVersion } from './kit.ts';
 
 const OUT = path.join(ROOT, '.vercel', 'output');
-const STATIC = path.join(OUT, 'static');
-const FUNC = path.join(OUT, 'functions', 'api', 'human.func');
 const PUBLIC_DIR = path.join(ROOT, 'src/viewer/public');
 
 // The rating code imports modules that also build packets and screenshots; those paths never run
@@ -44,8 +43,9 @@ function copyInto(from: string, to: string) {
   fs.cpSync(from, to, { recursive: true });
 }
 
-export async function buildHostedSite(): Promise<void> {
-  fs.rmSync(OUT, { recursive: true, force: true });
+export async function buildHostedSite(out = OUT): Promise<void> {
+  const STATIC = path.join(out, 'static');
+  fs.rmSync(out, { recursive: true, force: true });
   const server = await startViewer(0);
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/`;
   const get = async <T = any>(p: string): Promise<T> => {
@@ -58,9 +58,23 @@ export async function buildHostedSite(): Promise<void> {
   try {
     const meta = await get('meta');
     const version: string = meta.ratingVersions.at(-1);
-    writeJsonFile(path.join(STATIC, 'data/meta.json'), { ...meta, promptVersions: [version], ratingVersions: [version], hosted: true });
+    const categories = (Object.values(meta.categories) as { id: string; ratingVersions: string[] }[])
+      .filter((c) => c.ratingVersions.length)
+      .map((c) => ({ ...c, version: c.ratingVersions.at(-1)! }));
+    writeJsonFile(path.join(STATIC, 'data/meta.json'), {
+      ...meta,
+      promptVersions: [version],
+      ratingVersions: [version],
+      categories: Object.fromEntries(categories.map(({ version: v, ...c }) => [c.id, { ...c, promptVersions: [v], ratingVersions: [v] }])),
+      hosted: true,
+    });
 
-    const cases = await get<any[]>('cases');
+    // Each category's robustness tests: the summary only; the planted variants are never published.
+    for (const id of Object.keys(meta.categories)) {
+      writeJsonFile(path.join(STATIC, `data/robustness${id === 'layout' ? '' : `.${id}`}.json`), await get(`robustness?category=${id}`));
+    }
+
+    const cases = (await get<any[]>('cases')).filter((c) => c.inGrid || c.categories.length);
     writeJsonFile(path.join(STATIC, 'data/cases.json'), cases.map((c) => ({ ...c, bundles: c.latest ? [c.latest.bundleId] : [], humanRatings: [] })));
 
     const kit: HostedKit = { github: githubTarget(), cases: {} };
@@ -94,6 +108,7 @@ export async function buildHostedSite(): Promise<void> {
       if (!c.latest) continue;
       const caseId: string = c.caseId;
       const bundleId: string = c.latest.bundleId;
+      if (meta.categories[caseId]) throw new Error(`Interface ${caseId} has a category's name, which the ratings routes cannot tell apart.`);
       const data = await get(`case/${caseId}`);
       writeJsonFile(path.join(STATIC, `data/case/${caseId}.json`), { ...data, summary: { ...data.summary, bundles: [bundleId], humanRatings: [] } });
 
@@ -106,27 +121,25 @@ export async function buildHostedSite(): Promise<void> {
       ];
       for (const p of new Set(statePaths)) copyEvidence(`${caseId}/${bundleId}/${p}`);
 
-      const prompt = await get(`prompt/${caseId}/${bundleId}?version=${version}`);
-      writeJsonFile(path.join(STATIC, `data/prompt/${caseId}/${bundleId}.${version}.json`), prompt);
-      for (const img of prompt.images as { path: string }[]) copyEvidence(img.path);
-
-      const human = await get(`human/${caseId}`);
+      // What the judge sees and what a rating is checked against, per category. Layout's files keep
+      // their names from before other categories were rated.
       const bundle = loadBundle(caseId, bundleId);
-      kit.cases[caseId] = {
-        latestBundleId: bundleId,
-        judge: human.judge,
-        bundles: {
-          [bundleId]: {
-            interfaceId: bundle.interfaceId,
-            versions: { [version]: { promptHash: prompt.promptHash, packetHash: prompt.packetHash, packet: loadOrBuildPacket(bundle, version), request: prompt } },
-          },
-        },
-      };
+      const judge: Record<string, unknown[]> = {};
+      const versions: Record<string, Record<string, HostedVersion>> = {};
+      for (const { id, version: v } of categories) {
+        const layout = id === 'layout';
+        const prompt = await get(`prompt/${caseId}/${bundleId}?category=${id}&version=${v}`);
+        writeJsonFile(path.join(STATIC, `data/prompt/${caseId}/${bundleId}.${layout ? '' : `${id}.`}${v}.json`), prompt);
+        for (const img of prompt.images as { path: string }[]) copyEvidence(img.path);
+        judge[id] = (await get(`human/${layout ? '' : `${id}/`}${caseId}`)).judge;
+        versions[id] = { [v]: { promptHash: prompt.promptHash, packetHash: prompt.packetHash, packet: loadOrBuildPacket(bundle, v, id), request: prompt } };
+      }
+      kit.cases[caseId] = { latestBundleId: bundleId, judge, bundles: { [bundleId]: { interfaceId: bundle.interfaceId, categories: versions } } };
 
       const manifest = loadCase(caseId);
       if (manifest.source.type === 'static') {
         const src = path.join(caseDir(caseId), manifest.source.dir);
-        copyInto(src, path.join(STATIC, 'site', caseId));
+        await writeInlinedSite(src, path.join(STATIC, 'site', caseId));
         copyInto(src, path.join(STATIC, 'code', caseId));
       }
     }
@@ -135,40 +148,48 @@ export async function buildHostedSite(): Promise<void> {
     const indexFile = path.join(STATIC, 'index.html');
     fs.writeFileSync(indexFile, fs.readFileSync(indexFile, 'utf8').replace('<script type="module"', '<script>window.DJ_HOSTED = true;</script>\n    <script type="module"'));
 
-    await build({
-      entryPoints: [path.join(ROOT, 'src/hosted/api.ts')],
-      outfile: path.join(FUNC, 'index.mjs'),
-      bundle: true,
-      platform: 'node',
-      format: 'esm',
-      target: 'node22',
-      plugins: [stubNative],
-      banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
-      logLevel: 'warning',
-    });
-    writeJsonFile(path.join(FUNC, 'kit.json'), kit);
-    writeJsonFile(path.join(FUNC, '.vc-config.json'), { runtime: 'nodejs22.x', handler: 'index.mjs', launcherType: 'Nodejs', shouldAddHelpers: false, maxDuration: 30 });
+    await buildRatingsFunction(path.join(out, 'functions', 'api', 'human.func'), kit);
 
-    writeJsonFile(path.join(OUT, 'config.json'), {
+    writeJsonFile(path.join(out, 'config.json'), {
       version: 3,
       routes: [
         { src: '^/api/human/?$', dest: '/api/human' },
         { src: '^/api/human/(.+)$', dest: '/api/human?path=$1' },
         { src: '^/files/human/(ratings|findings|points)\\.csv$', dest: '/api/human?csv=$1' },
+        { src: '^/files/human/([a-z_]+)/(ratings|findings|points)\\.csv$', dest: '/api/human?csv=$2&category=$1' },
         { src: '^/data/(.*)$', headers: { 'cache-control': 'public, max-age=0, must-revalidate' }, continue: true },
         { src: '^/site/(.*)$', headers: { 'access-control-allow-origin': '*' }, continue: true },
+        // Sites link their files relatively, which only resolves under the trailing slash.
+        { src: '^/site/([^/]+)$', status: 308, headers: { Location: '/site/$1/' } },
         { handle: 'filesystem' },
-        { src: '^/site/([^/]+)/?$', dest: '/site/$1/index.html' },
+        { src: '^/site/([^/]+)/$', dest: '/site/$1/index.html' },
         { src: '^/api/(.*)$', status: 404, dest: '/404.json' },
       ],
     });
     writeJsonFile(path.join(STATIC, '404.json'), { error: 'Not found' });
     log(
-      `Built hosted site in ${path.relative(ROOT, OUT)}: ${Object.keys(kit.cases).length} interfaces, ${runs.length} judge runs (${judgments} judgments), prompt ${version} for rating, ${copied.size} images; ratings go to ${kit.github.repo}/${kit.github.dir} on ${kit.github.branch}`,
+      `Built hosted site in ${path.relative(ROOT, out)}: ${Object.keys(kit.cases).length} interfaces, ${runs.length} judge runs (${judgments} judgments), rating ${categories.map((c) => `${c.id} ${c.version}`).join(', ')}, ${copied.size} images; ratings go to ${kit.github.repo}/${kit.github.dir} on ${kit.github.branch}`,
     );
   } finally {
     server.close();
   }
+}
+
+// The ratings function and its kit, in Vercel's function format.
+export async function buildRatingsFunction(funcDir: string, kit: HostedKit): Promise<void> {
+  await build({
+    entryPoints: [path.join(ROOT, 'src/hosted/api.ts')],
+    outfile: path.join(funcDir, 'index.mjs'),
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node22',
+    plugins: [stubNative],
+    banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
+    logLevel: 'warning',
+  });
+  writeJsonFile(path.join(funcDir, 'kit.json'), kit);
+  writeJsonFile(path.join(funcDir, '.vc-config.json'), { runtime: 'nodejs22.x', handler: 'index.mjs', launcherType: 'Nodejs', shouldAddHelpers: false, maxDuration: 30 });
 }
 
 // The GitHub repo of `origin` (override with DJ_RATINGS_REPO=owner/name); ratings go to its main

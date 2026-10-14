@@ -275,7 +275,7 @@ function observationLines(b: ObservationBlock): string[] {
 
 // The same layout as a check issue: one block per value, with what, where and which screenshots show it.
 function measuredValueBlock(l: FindingLine, images: PacketImage[]): string[] {
-  const inShots = images.filter((img) => lineVisibleIn(l, img)).map((img) => img.id);
+  const inShots = images.filter((img) => lineVisibleIn(l, img) || l.shots?.includes(img.id)).map((img) => img.id);
   const shots = inShots.length ? inShots.join(', ') : l.located ? 'none show it' : 'none; it is measured across widths';
   return [`  Value (cite ${l.ids[0]})`, `    What was measured: ${l.text}`, `    Where: ${l.where}.`, `    Screenshots: ${shots}.`];
 }
@@ -287,6 +287,14 @@ function observationBlockLines(b: ObservationBlock, images: PacketImage[]): stri
 export interface FindingsRenderOptions {
   // Measurements as blocks shaped like check issues; needs the packet's images.
   measurementBlocks?: { images: PacketImage[] };
+  // What the measurements under each criterion are, for categories that show whole profiles.
+  measurementsIntro?: string;
+  // Categories without measurements leave the measurement lines out; criteria listed in
+  // `uncheckedCriteria` have no automated checks at all, and those in `unmeasuredCriteria` no
+  // measurements.
+  checksOnly?: boolean;
+  uncheckedCriteria?: string[];
+  unmeasuredCriteria?: string[];
 }
 
 export function renderFindingsCriterion(c: FindingsCriterion, rubric: ParsedRubric, opts: FindingsRenderOptions = {}): string {
@@ -306,25 +314,35 @@ export function renderFindingsCriterion(c: FindingsCriterion, rubric: ParsedRubr
     '<evidence>',
     checks.length
       ? 'Automated checks that failed for this criterion (objective problems found by code):'
-      : 'Automated checks: none failed for this criterion.',
+      : opts.uncheckedCriteria?.includes(c.criterion)
+        ? 'Automated checks: none apply to this criterion.'
+        : 'Automated checks: none failed for this criterion.',
     ...checks,
-    '',
-    observations.length
-      ? 'Measurements outside or near the rubric reference (values for you to weigh; they are not failures):'
-      : 'Measurements: all within the rubric reference for this criterion.',
-    ...observations,
+    ...(opts.checksOnly
+      ? []
+      : [
+          '',
+          observations.length
+            ? (opts.measurementsIntro ?? 'Measurements outside or near the rubric reference (values for you to weigh; they are not failures):')
+            : opts.unmeasuredCriteria?.includes(c.criterion)
+              ? 'Measurements: none apply to this criterion.'
+              : opts.measurementsIntro
+                ? 'Measurements: none for this criterion.'
+                : 'Measurements: all within the rubric reference for this criterion.',
+          ...observations,
+        ]),
     '</evidence>',
     '</criterion>',
   ].join('\n');
 }
 
-export function renderFindingsStates(states: FindingsState[]): string {
+export function renderFindingsStates(states: FindingsState[], pseudoNote = PSEUDO_NOTE): string {
   let pseudoNoted = false;
   return states
     .flatMap((s) => {
       const out = [`- ${s.text} (${s.state})`];
       if (s.pseudo && !pseudoNoted) {
-        out.push(`  ${PSEUDO_NOTE}`);
+        out.push(`  ${pseudoNote}`);
         pseudoNoted = true;
       }
       return out;
@@ -336,13 +354,19 @@ export function renderUserParts(
   template: string,
   packet: Packet,
   rubric: ParsedRubric,
-  opts: { measurementBlocks?: boolean } = {},
+  opts: { measurementBlocks?: boolean; pseudoNote?: string; measurementsIntro?: string; checksOnly?: boolean; uncheckedCriteria?: string[]; unmeasuredCriteria?: string[] } = {},
 ): { parts: UserPart[]; text: string } {
   const evidence = packet.evidence as Record<string, any>;
   const findings = evidence.format === 'findings';
   const labels = new Map<string, string>(((evidence.states ?? []) as EvState[]).map((s) => [s.state, s.label]));
   const stateLabel = (id: string) => labels.get(id) ?? id;
-  const findingsOpts: FindingsRenderOptions = opts.measurementBlocks ? { measurementBlocks: { images: packet.images } } : {};
+  const findingsOpts: FindingsRenderOptions = {
+    ...(opts.measurementBlocks ? { measurementBlocks: { images: packet.images } } : {}),
+    ...(opts.measurementsIntro ? { measurementsIntro: opts.measurementsIntro } : {}),
+    ...(opts.checksOnly ? { checksOnly: true } : {}),
+    ...(opts.uncheckedCriteria ? { uncheckedCriteria: opts.uncheckedCriteria } : {}),
+    ...(opts.unmeasuredCriteria ? { unmeasuredCriteria: opts.unmeasuredCriteria } : {}),
+  };
   const criteria = findings
     ? ((evidence.criteria ?? []) as FindingsCriterion[]).map((c) => renderFindingsCriterion(c, rubric, findingsOpts)).join('\n\n')
     : ((evidence.criteria ?? []) as EvCriterion[]).map((c) => renderCriterion(c, rubric, stateLabel)).join('\n\n');
@@ -352,7 +376,7 @@ export function renderUserParts(
   const filled = template
     .replace('{{REQUEST}}', packet.request)
     .replace('{{INTERFACE_ID}}', packet.interfaceId)
-    .replace('{{STATES}}', findings ? renderFindingsStates(evidence.states ?? []) : renderStates(evidence, rubric))
+    .replace('{{STATES}}', findings ? renderFindingsStates(evidence.states ?? [], opts.pseudoNote) : renderStates(evidence, rubric))
     .replace('{{CRITERIA}}', criteria)
     .replace('{{NOTES}}', notes);
   const [before, after] = filled.split('{{SCREENSHOTS}}');

@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('change', (e) => { if (e.target.id === 'email') { e.target.value = ''; e.target.dispatchEvent(new Event('input', { bubbles: true })); } }, true);",
+  "case": "booking-clean",
+  "id": "email-field-cleared",
+  "kind": "defect",
+  "title": "Email field empties when the user moves on",
+  "symptom": "Whatever is typed into \"Email\" is wiped as soon as the user moves to the next field, so a booking can only be confirmed by typing the email again as the very last thing.",
+  "where": {},
+  "severity": "moderate"
+}

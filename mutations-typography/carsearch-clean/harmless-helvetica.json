@@ -1,0 +1,17 @@
+{
+  "id": "harmless-helvetica",
+  "case": "carsearch-clean",
+  "kind": "harmless",
+  "title": "Whole page in Helvetica",
+  "symptom": "The page uses Helvetica Neue throughout instead of the system font. It is still one family, with the same sizes and weights.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "none",
+  "css": ":root { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }",
+  "js": null
+}

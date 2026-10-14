@@ -1,0 +1,11 @@
+{
+  "css": "#section-practitioner { display: none !important; }",
+  "js": "const apply = () => { document.querySelectorAll('.form-section:not(#section-practitioner) .step').forEach((s, i) => { if (s.textContent !== String(i + 1)) s.textContent = String(i + 1); });\ndocument.querySelectorAll(\"#section-time .hint\").forEach((el) => { const to = {\"Showing times with any available practitioner.\":\"Showing all available times.\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; });\ndocument.querySelectorAll('.summary__row').forEach((r) => { if (r.querySelector('dt')?.textContent.trim() === 'Practitioner') r.remove(); }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "booking-clean",
+  "id": "no-practitioner-step",
+  "kind": "defect",
+  "title": "No way to pick a practitioner",
+  "symptom": "The practitioner step is gone: the form runs Treatment, Date and time, Your details (numbered 1 to 3), times are shown for any practitioner, and the summary no longer mentions one. The request explicitly asks for patients to pick a practitioner.",
+  "where": {},
+  "severity": "severe"
+}

@@ -75,6 +75,45 @@ describe.skipIf(!caseId)('Human ratings', () => {
     expect(csvs['points.csv'].trim().split('\n')).toHaveLength(1);
   });
 
+  it('keeps each other category in its own folder with its own CSVs, leaving Layout ratings as they were', async () => {
+    const { saveRating, listRatings, loadRating } = await import('../src/human/store.ts');
+    const { buildRequest, ensurePacketImages, loadOrBuildPacket } = await import('../src/categories/index.ts');
+    const { mockProvider } = await import('../src/judge/providers/mock.ts');
+    const { bundleDir, loadBundle } = await import('../src/store.ts');
+    const bundle = loadBundle(caseId!);
+    const outputFor = async (category: string, version: string) => {
+      const packet = loadOrBuildPacket(bundle, version, category);
+      await ensurePacketImages(packet, bundleDir(caseId!, bundle.bundleId));
+      const req = buildRequest(packet, bundleDir(caseId!, bundle.bundleId), version);
+      return JSON.parse((await mockProvider('ok').call(req, { model: 'm', effort: 'low', caseId: caseId!, repeat: 1, packet })).outputText!);
+    };
+    const layoutBefore = listRatings(caseId!).length;
+
+    const cq = await saveRating(caseId!, { bundleId: bundle.bundleId, promptVersion: 'v1', rater: 'Ada', output: await outputFor('content_quality', 'v1') }, 'content_quality');
+    expect(cq.errors).toBeUndefined();
+    expect(cq.rating!.category).toBe('content_quality');
+    expect(fs.existsSync(path.join(dir, 'content_quality', caseId!, `${cq.rating!.ratingId}.json`))).toBe(true);
+    expect(loadRating(caseId!, cq.rating!.ratingId, 'content_quality').ratingId).toBe(cq.rating!.ratingId);
+    expect(listRatings(caseId!, 'content_quality')).toHaveLength(1);
+    expect(listRatings(caseId!)).toHaveLength(layoutBefore);
+    expect(listRatings().every((r) => !('category' in r))).toBe(true);
+
+    const cqHeader = fs.readFileSync(path.join(dir, 'content_quality', 'ratings.csv'), 'utf8').split('\n')[0];
+    expect(cqHeader).toContain('criterion_C_summary');
+    expect(cqHeader).not.toContain('criterion_D_summary');
+    expect(fs.readFileSync(path.join(dir, 'ratings.csv'), 'utf8').split('\n')[0]).toContain('criterion_D_summary');
+    expect(fs.existsSync(path.join(dir, 'typography'))).toBe(false);
+
+    // Content Quality has no criterion D, so its output is not a Typography rating.
+    const wrong = await saveRating(caseId!, { bundleId: bundle.bundleId, promptVersion: 'v1', rater: 'Ada', output: await outputFor('content_quality', 'v1') }, 'typography');
+    expect(wrong.errors?.length).toBeGreaterThan(0);
+
+    const layout = await saveRating(caseId!, { bundleId: bundle.bundleId, promptVersion: 'v6', rater: 'Ada', output: await outputFor('layout', 'v6') });
+    expect(layout.errors).toBeUndefined();
+    expect('category' in layout.rating!).toBe(false);
+    expect(fs.existsSync(path.join(dir, caseId!, `${layout.rating!.ratingId}.json`))).toBe(true);
+  });
+
   it('rejects output that does not match the schema, and a missing rater', async () => {
     const { saveRating } = await import('../src/human/store.ts');
     const { loadBundle } = await import('../src/store.ts');

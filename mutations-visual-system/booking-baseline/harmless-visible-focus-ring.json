@@ -1,0 +1,11 @@
+{
+  "css": ":focus-visible { outline: 2px solid #b45309 !important; outline-offset: 2px; }",
+  "js": null,
+  "case": "booking-baseline",
+  "id": "harmless-visible-focus-ring",
+  "kind": "harmless",
+  "title": "A stronger keyboard focus ring",
+  "symptom": "Every control gets a 2 px amber focus ring offset from its edge in place of the browser default.",
+  "where": {},
+  "severity": "none"
+}

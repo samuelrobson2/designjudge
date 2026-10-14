@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('submit', (e) => { e.preventDefault(); e.stopImmediatePropagation(); }, true);",
+  "case": "booking-baseline",
+  "id": "confirm-swallowed",
+  "kind": "defect",
+  "title": "Confirm booking does nothing",
+  "symptom": "Pressing \"Confirm booking\" (in the summary or the phone action bar) does nothing at all: no validation messages for an incomplete form and no confirmation for a complete one, so the booking can never be made.",
+  "where": {},
+  "severity": "severe"
+}

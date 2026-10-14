@@ -231,7 +231,7 @@ const dashboard = [
       'The backdrop behind the order panel was given a z-index, so it is painted on top of the panel. After opening an order the panel appears greyed out, and any tap on its buttons hits the backdrop and closes the panel instead.',
     where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: 'Click an order in "Recent orders"' },
     severity: 'severe',
-    css: `.scrim { z-index: 1; }`,
+    css: `.scrim { z-index: 32; }`,
   },
   {
     id: 'topbar-covers-drawer',
@@ -544,7 +544,141 @@ const carsearch = [
   },
 ];
 
-const CASES = { 'booking-baseline': booking, 'dashboard-baseline': dashboard, 'carsearch-baseline': carsearch };
+// Planted into the clean controls, for judging for real: each defect is a material Layout weakness.
+const bookingClean = [
+  {
+    id: 'date-strip-overflows-phone',
+    kind: 'defect',
+    title: 'Dates and times run off the side of phone screens',
+    symptom:
+      'Below 640 px the date strip keeps all six dates in one row of 92 px days and the time grid keeps five 92 px columns, so on a phone more than half of the dates and times lie beyond the right edge of the screen and the whole page scrolls sideways.',
+    where: { viewports: ['phone'], widths: [320, 639], content: null, interaction: null },
+    severity: 'severe',
+    css: `@media (max-width: 639px) {\n  .date-strip { grid-template-columns: repeat(6, 92px) !important; }\n  .slot-grid { grid-template-columns: repeat(5, 92px) !important; }\n}`,
+  },
+  {
+    id: 'treatment-list-clipped',
+    kind: 'defect',
+    title: 'Treatment list cut off after two options',
+    symptom:
+      'The treatment list is limited to 190 px and clips what does not fit, so only the first two treatments show in full, the third is cut through and the fourth is hidden. Nothing shows that there are more options, and they cannot be scrolled to.',
+    where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: null },
+    severity: 'severe',
+    css: `.option-list { max-height: 190px; }`,
+  },
+  {
+    id: 'grouping-inverted',
+    kind: 'defect',
+    title: 'Headings and labels sit closer to the previous item than to their own',
+    symptom:
+      'The dividers between steps are gone and the spacing is inverted: each step heading sits 48 px above its own options but about 24 px below the previous step, and each field label sits 28 px above its own box but 4 px below the box above it, so headings and labels read as belonging to what comes before them.',
+    where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: null },
+    severity: 'moderate',
+    css: `.form-section { padding: 12px 0 !important; }\n.form-section + .form-section { border-top: 0 !important; }\n.form-section__head { margin-bottom: 48px !important; }\n.booking-form { padding-top: 20px; padding-bottom: 20px; }\n.field { gap: 28px !important; }\n.field + .field { margin-top: 4px !important; }`,
+  },
+  {
+    id: 'harmless-roomier-form',
+    kind: 'harmless',
+    title: 'More room inside the form on wide screens',
+    symptom: 'From 1024 px the form has 40 px side padding instead of 32 px, its steps 40 px instead of 36 px above and below, and the gap to the summary is 48 px instead of 40 px.',
+    where: { viewports: ['desktop'], widths: [1024, 1920], content: null, interaction: null },
+    severity: 'none',
+    css: `@media (min-width: 1024px) {\n  .booking-form { padding: 0 40px; }\n  .form-section { padding: 40px 0; }\n  .booking-layout { gap: 48px; }\n}`,
+  },
+];
+
+const carsearchClean = [
+  {
+    id: 'prices-and-ratings-cut-off',
+    kind: 'defect',
+    title: 'Prices and price ratings cut off on every car',
+    symptom:
+      'Each price is clipped to a box four characters wide ("£10,", "£14,") and each price-rating line to 136 px, so the full price and the amount above or below average cannot be read on any listing.',
+    where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: null },
+    severity: 'severe',
+    css: `.car__price { width: 4ch; overflow: hidden; white-space: nowrap; }\n.car__rating { flex-wrap: nowrap; width: 136px; overflow: hidden; white-space: nowrap; }`,
+  },
+  {
+    id: 'results-overlap-filters',
+    kind: 'defect',
+    title: 'Results slide over the filter panel on desktop',
+    symptom:
+      'From 1024 px the results column is pulled 150 px to the left and painted on top of the filter panel, so the first column of cars covers the right half of the filters, hiding their counts and part of each option.',
+    where: { viewports: ['desktop'], widths: [1024, 1920], content: null, interaction: null },
+    severity: 'severe',
+    css: `@media (min-width: 1024px) {\n  .results { margin-left: -150px; position: relative; }\n}`,
+  },
+  {
+    id: 'search-form-overflows-phone',
+    kind: 'defect',
+    title: 'Postcode search runs off the side of phone screens',
+    symptom:
+      'Below 768 px the postcode field, distance menu and Search button stay on one row at their desktop widths, so on a phone the Search button lies beyond the right edge and the page scrolls sideways.',
+    where: { viewports: ['phone'], widths: [320, 767], content: null, interaction: null },
+    severity: 'moderate',
+    css: `@media (max-width: 767px) {\n  .location { display: flex !important; flex-wrap: nowrap; }\n  .location__field, .location .btn { flex: none; }\n  #postcode { width: 150px !important; }\n  #distance { width: 190px !important; }\n}`,
+  },
+  {
+    id: 'harmless-card-padding',
+    kind: 'harmless',
+    title: 'More padding inside the car cards',
+    symptom: 'The text of each car card has 4 px more padding on each side (20 px top, 24 px sides and bottom). The grid and its gaps are unchanged.',
+    where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: null },
+    severity: 'none',
+    css: `.car__body { padding: 20px 24px 24px; }`,
+  },
+];
+
+const dashboardClean = [
+  {
+    id: 'minor-product-rows-misgrouped',
+    kind: 'defect',
+    title: "Top products' bars and sales sit closer to the next product than to their own",
+    symptom:
+      'In Top products each name and revenue sit 22 px above their own bar, while the bar and its "sold" count sit 2 px above the next product\'s name, so every bar and count reads as belonging to the product below it.',
+    where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: null },
+    severity: 'minor',
+    css: `.products__list { row-gap: 2px !important; }\n.bar { margin-top: 22px !important; }\n.product__meta { margin-top: 2px !important; }`,
+  },
+  {
+    id: 'revenue-chart-squashed',
+    kind: 'defect',
+    title: 'Revenue chart squashed into a thin strip',
+    symptom:
+      'The revenue chart is drawn 52 px tall at every width, leaving the rest of the revenue card empty: the trend is a near-flat line and the five axis labels are crammed into 36 px, on top of each other.',
+    where: { viewports: ['desktop', 'tablet', 'phone'], content: null, interaction: null },
+    severity: 'severe',
+    css: `.chart__canvas { flex: none !important; min-height: 0 !important; height: 52px; }`,
+  },
+  {
+    id: 'orders-table-clipped-narrow',
+    kind: 'defect',
+    title: 'Orders table cut off on tablets and phones',
+    symptom:
+      'Below 1024 px the orders table keeps a 760 px width inside a card that clips it, so on a tablet the Status column is cut off and on a phone the Total and Status columns are hidden.',
+    where: { viewports: ['tablet', 'phone'], widths: [320, 1023], content: null, interaction: null },
+    severity: 'severe',
+    css: `@media (max-width: 1023px) {\n  .orders { overflow: hidden; }\n  .orders__table { width: 760px; }\n}`,
+  },
+  {
+    id: 'harmless-roomier-cards',
+    kind: 'harmless',
+    title: 'More space between and inside the cards on wide screens',
+    symptom: 'From 1024 px the gap between cards grows from 28 px to 36 px and the card padding from 24 px to 28 px.',
+    where: { viewports: ['desktop'], widths: [1024, 1920], content: null, interaction: null },
+    severity: 'none',
+    css: `@media (min-width: 1024px) {\n  :root { --gap: 36px; --pad: 28px; }\n}`,
+  },
+];
+
+const CASES = {
+  'booking-baseline': booking,
+  'dashboard-baseline': dashboard,
+  'carsearch-baseline': carsearch,
+  'booking-clean': bookingClean,
+  'carsearch-clean': carsearchClean,
+  'dashboard-clean': dashboardClean,
+};
 
 function fmtWhere(w) {
   const parts = [];
@@ -585,6 +719,24 @@ Tools:
 
 - \`_tools/build-items.mjs\` regenerates all item files and this README.
 - \`_tools/preview.mjs <case> <item-id|baseline|all> [--vp=..] [--fixture=..] [--base]\` serves the case, applies the item and writes screenshots to \`_previews/<case>/\`.
+
+## Clean bases
+
+The \`*-clean\` folders plant defects into the clean controls (\`cases/*-clean\`), which have no material weakness in any category. Each defect is a material Layout weakness, so a sound judge scores the variant below its clean base; each harmless change should leave the Layout score unchanged. \`mutations-typography/\`, \`mutations-task-fit/\` and \`mutations-content-quality/\` have clean-base folders built the same way for their own categories.
+
+## Judging planted variants
+
+\`--judge\` collects as usual, then judges the clean control and every variant for real, in the folder's category (Layout for \`mutations/\`, otherwise the one in the folder name; \`--category\` overrides). With \`--rescore <runId>\` it judges a previous run's evidence without collecting again:
+
+\`\`\`
+npm run mutate -- booking-clean carsearch-clean dashboard-clean --judge
+npm run mutate -- booking-clean carsearch-clean dashboard-clean --dir mutations-typography --judge
+npm run mutate -- --rescore <runId> --dir mutations-typography --judge
+\`\`\`
+
+Each control is judged 5 times (\`--base-repeats\`) and each variant 3 times (\`--repeats\`); \`--provider\`, \`--model\`, \`--effort\` and \`--prompt\` are as for \`npm run judge\`, and \`--provider mock\` checks the harness for free. The expected direction comes from the file name alone: a \`harmless-*\` variant should score the same as its control (means within half a point, compare's \`no_change\`), a \`minor-*\` defect, which the judges consistently find minor, should not score more than half a point higher (\`no_rise\`), and anything else lower (compare's \`must_drop\`: a lower mean, with at least 80% of control × variant score pairs not higher). A miss with fewer than 3 valid scores on either side reads "needs more repeats".
+
+The judge sees what any interface's judge sees: the base case's request and an opaque interface ID. Before any call, every prompt is checked for the case name and the variant's file name, title and symptom. Results go to \`artifacts/mutations/<runId>/judge/<judge run>/\` (\`report.json\`, the requests and judgments), not \`artifacts/runs/\`, so variants never appear in the viewer or on the rating site.
 
 | Case | Id | Kind | Severity | Where | Title |
 | --- | --- | --- | --- | --- | --- |

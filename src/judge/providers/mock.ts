@@ -1,4 +1,4 @@
-import { LAYOUT_ANCHORS, LAYOUT_CRITERIA } from '../../categories/layout/definition.ts';
+import { categoryOf } from '../../categories/index.ts';
 import type { LayoutFinding, LayoutJudgment } from '../../categories/layout/schema.ts';
 import type { Provider, ProviderResult } from './types.ts';
 
@@ -13,8 +13,34 @@ const CHECK_CRITERION: Record<string, string> = {
   page_horizontal_overflow: 'D',
   interactive_reachability: 'D',
   responsive_layout_failures: 'D',
+  invalid_text_rendering: 'B',
+  required_contrast: 'A',
+  accessibility_violations: 'C',
+  focus_visibility: 'C',
+  target_size: 'C',
+  no_effect_controls: 'A',
+  form_submission: 'A',
+  navigation_integrity: 'A',
+  control_operability: 'B',
+  editable_response: 'B',
+  toggle_state: 'B',
+  invalid_submission: 'D',
+  runtime_errors: 'D',
 };
 const CHECK_POINT: Record<string, string> = {
+  required_contrast: 'perceptual_contrast',
+  accessibility_violations: 'accessible_semantics',
+  focus_visibility: 'focus',
+  target_size: 'targeting',
+  no_effect_controls: 'path_continuity',
+  form_submission: 'end_to_end_completion',
+  navigation_integrity: 'path_continuity',
+  control_operability: 'control_behavior',
+  editable_response: 'input_handling',
+  toggle_state: 'control_behavior',
+  invalid_submission: 'validation',
+  runtime_errors: 'failure_handling',
+  invalid_text_rendering: 'readable_sizing',
   region_overlap: 'structural_integrity',
   collapsed_dimensions: 'usable_sizing',
   occluded_content: 'structural_integrity',
@@ -40,8 +66,10 @@ export function mockProvider(mode: 'ok' | 'invalid_json' | 'unknown_refs'): Prov
       const failing = Object.entries(index).filter(([, e]) => e.type === 'check' && e.status === 'fail');
       const missing = Object.entries(index).filter(([, e]) => e.type === 'check' && (e.status === 'unavailable' || e.status === 'not_collected'));
 
+      const category = categoryOf(req.category ?? opts.packet.category ?? 'layout');
+      const CRITERIA = category.criteria;
       const criteria: LayoutJudgment['criteria'] = {};
-      for (const c of LAYOUT_CRITERIA) {
+      for (const c of CRITERIA) {
         criteria[c.id] = {
           summary: `[MOCK] Placeholder summary for criterion ${c.id} (${c.name}).`,
           evaluation_points: Object.fromEntries(c.points.map((p) => [p.key, { applicable: true, assessment: `[MOCK] ${p.name} not assessed by the mock provider.` }])),
@@ -53,7 +81,7 @@ export function mockProvider(mode: 'ok' | 'invalid_json' | 'unknown_refs'): Prov
         list.push({ id: `${cid}${list.length + 1}`, ...f });
       };
       push('A', {
-        evaluation_point: 'primary_focus',
+        evaluation_point: CRITERIA[0].points[0].key,
         polarity: 'strength',
         materiality: 'minor',
         observation: '[MOCK] Placeholder strength citing the first screenshot.',
@@ -61,13 +89,25 @@ export function mockProvider(mode: 'ok' | 'invalid_json' | 'unknown_refs'): Prov
         evidence_refs: [mode === 'unknown_refs' ? 'S-does-not-exist' : firstShot],
         states: ['desktop'],
       });
+      const firstText = Object.keys(index).find((k) => index[k].type === 'page_text');
+      if (firstText) {
+        push('A', {
+          evaluation_point: CRITERIA[0].points[0].key,
+          polarity: 'strength',
+          materiality: 'minor',
+          observation: '[MOCK] Placeholder strength citing the page text.',
+          why_it_matters: '[MOCK] Exercises page-text citation.',
+          evidence_refs: [firstText],
+          states: index[firstText].stateId ? [index[firstText].stateId!] : [],
+        });
+      }
       const failedTypes = new Set<string>();
       for (const [id, entry] of failing) {
         const diagId = entry.resultKey?.split('@')[0] ?? '';
         failedTypes.add(diagId);
         const cid = CHECK_CRITERION[diagId] ?? 'C';
         push(cid, {
-          evaluation_point: CHECK_POINT[diagId] ?? LAYOUT_CRITERIA.find((c) => c.id === cid)!.points[0].key,
+          evaluation_point: CHECK_POINT[diagId] ?? CRITERIA.find((c) => c.id === cid)!.points[0].key,
           polarity: 'weakness',
           materiality: 'material',
           observation: `[MOCK] Deterministic check ${id} failed.`,
@@ -83,7 +123,7 @@ export function mockProvider(mode: 'ok' | 'invalid_json' | 'unknown_refs'): Prov
         untrusted_content_notes: [],
         overall: {
           score,
-          anchor: LAYOUT_ANCHORS.find((a) => a.score === score)!.label,
+          anchor: category.anchors.find((a) => a.score === score)!.label,
           ...(asksDecisive(req.schema)
             ? { decisive_finding_ids: Object.values(criteria).flatMap((c) => c.findings.filter((f) => f.polarity === 'weakness').map((f) => f.id)).slice(0, 3) }
             : {}),

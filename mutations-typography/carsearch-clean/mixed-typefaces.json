@@ -1,0 +1,17 @@
+{
+  "id": "mixed-typefaces",
+  "case": "carsearch-clean",
+  "kind": "defect",
+  "title": "Five typefaces with no clear roles",
+  "symptom": "Car names are in Georgia, prices in Courier New, the filter panel in Verdana, the page title and results heading in Trebuchet MS, and the price ratings and specs in italic Times New Roman, beside the system font for everything else.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "moderate",
+  "css": ".car__title { font-family: Georgia, 'Times New Roman', serif; }\n.car__price { font-family: 'Courier New', Courier, monospace; }\n.filters, .filters h2, .filters h3 { font-family: Verdana, Geneva, sans-serif; }\n.page__head h1, .results__head h2 { font-family: 'Trebuchet MS', sans-serif; }\n.car__rating, .specs { font-family: 'Times New Roman', Times, serif; font-style: italic; }",
+  "js": null
+}

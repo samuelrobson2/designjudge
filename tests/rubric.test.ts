@@ -9,7 +9,7 @@ import type { Packet } from '../src/categories/types.ts';
 const parsed = parseLayoutRubric();
 
 describe('layout_rubric.md parsing', () => {
-  it('finds all twelve diagnostics with a pass definition or reference values', () => {
+  it('finds all twenty diagnostics with a pass definition or reference values', () => {
     expect(parsed.diagnostics.map((d) => d.diagId)).toEqual([
       'region_overlap',
       'container_overflow',
@@ -19,10 +19,18 @@ describe('layout_rubric.md parsing', () => {
       'occluded_content',
       'responsive_layout_failures',
       'content_growth_failures',
+      'proximity_inversion',
+      'broken_images',
       'spatial_grouping',
       'responsive_adaptation',
+      'media_fit',
       'alignment_outliers',
       'layout_stability',
+      'text_truncation',
+      'row_imbalance',
+      'hidden_scroll_items',
+      'pinned_over_used',
+      'viewport_parity',
     ]);
     for (const d of parsed.diagnostics) {
       if (d.kind === 'deterministic') expect(d.pass, d.name).toBeTruthy();
@@ -34,10 +42,10 @@ describe('layout_rubric.md parsing', () => {
   it("maps each criterion's Relevant Evidence to diagnostics", () => {
     const map = Object.fromEntries(parsed.criteria.map((c) => [c.id, c.diagIds]));
     expect(map).toEqual({
-      A: ['responsive_adaptation', 'interactive_reachability', 'spatial_grouping', 'alignment_outliers', 'region_overlap'],
-      B: ['container_overflow', 'content_growth_failures'],
-      C: ['responsive_adaptation', 'collapsed_dimensions', 'region_overlap', 'occluded_content', 'container_overflow'],
-      D: ['responsive_adaptation', 'responsive_layout_failures', 'content_growth_failures', 'page_horizontal_overflow', 'interactive_reachability', 'layout_stability'],
+      A: ['responsive_adaptation', 'interactive_reachability', 'spatial_grouping', 'alignment_outliers', 'region_overlap', 'proximity_inversion'],
+      B: ['container_overflow', 'content_growth_failures', 'text_truncation'],
+      C: ['responsive_adaptation', 'collapsed_dimensions', 'media_fit', 'region_overlap', 'occluded_content', 'container_overflow', 'broken_images', 'row_imbalance'],
+      D: ['responsive_adaptation', 'responsive_layout_failures', 'content_growth_failures', 'page_horizontal_overflow', 'interactive_reachability', 'layout_stability', 'hidden_scroll_items', 'pinned_over_used', 'viewport_parity'],
     });
   });
 

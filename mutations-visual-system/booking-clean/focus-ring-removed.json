@@ -1,0 +1,15 @@
+{
+  "css": ":focus, :focus-visible, .chip:has(input:focus-visible) { outline: none !important; box-shadow: none !important; }",
+  "js": null,
+  "case": "booking-clean",
+  "id": "focus-ring-removed",
+  "kind": "defect",
+  "title": "Keyboard focus ring removed from every control",
+  "symptom": "A reset rule removes the outline from focused treatments, practitioners, dates, times, fields and buttons and puts nothing in its place, so a keyboard user cannot see where they are in the form.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "severe"
+}

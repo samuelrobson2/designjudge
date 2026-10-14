@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeChange, measureChange } from '../src/collect/discover.ts';
+import { describeChange, measureChange, pickStates, type Discovered } from '../src/collect/discover.ts';
 
 type El = [string, number, number, number, number, string];
 const snap = (els: El[], height = 1000) => ({ url: 'http://x/', height, vw: 360, vh: 800, els });
@@ -48,5 +48,45 @@ describe('Interactive state discovery: change measurement', () => {
   it('ignores a tiny change such as a selected state on one small control', () => {
     const after: El[] = [...page, ['body>main[1]>section.form[1]>span.tick[1]', 20, 650, 12, 12, '']];
     expect(measureChange(snap(page), snap(after)).significant).toBe(false);
+  });
+
+  it('counts a floating layer however small, and names it', () => {
+    const c = measureChange(snap(page), snap([...page, ['body>main[1]>div.tip[1]', 16, 600, 120, 32, 'layer']]));
+    expect(c.significant).toBe(true);
+    expect(c.popups).toBe(1);
+    expect(describeChange({ selector: 's', label: 'Info', role: 'button', signature: 'x' }, c, 360 * 800)).toBe('After clicking button "Info": a menu, tooltip or popover appeared');
+  });
+
+  it('counts a newly expanded control only when something changed with it', () => {
+    const trigger = page[2][0];
+    const answer: El = ['body>main[1]>section.form[1]>p.answer[1]', 16, 700, 200, 20, ''];
+    const opened = measureChange(snap(page), { ...snap([...page, answer]), expanded: [trigger] });
+    expect(opened.significant).toBe(true);
+    expect(opened.expanded).toBe(1);
+    const nothing = measureChange(snap(page), { ...snap(page), expanded: [trigger] });
+    expect(nothing.significant).toBe(false);
+  });
+});
+
+describe('Interactive state discovery: which one-click states are kept', () => {
+  const cards: El[] = Array.from({ length: 6 }, (_, i) => [`body>main[1]>article.card[${i + 1}]`, 16, 100 + i * 150, 328, 140, '']);
+  const load = snap([...page, ...cards], 1000);
+  const found = (label: string, els: El[], height = 1000): Discovered => {
+    const after = snap(els, height);
+    const change = measureChange(load, after);
+    return { candidate: { selector: label, label, role: 'button', signature: label }, change, description: label, after };
+  };
+  const noResults: El = ['body>main[1]>div.empty[1]', 16, 100, 328, 600, ''];
+  const filterA = found('Petrol', [...page, noResults]);
+  const filterB = found('Manual', [...page, noResults]);
+  const validation = found('Confirm', [...page, ...cards, ['body>main[1]>div.errors[1]', 16, 60, 328, 30, 'alert']]);
+  const tooltip = found('Info', [...page, ...cards, ['body>main[1]>div.tip[1]', 16, 600, 120, 32, 'layer']]);
+
+  it('puts what opened or showed a message first, then other changes, and drops a screen the same as one kept', () => {
+    expect(filterA.change.score).toBeGreaterThan(tooltip.change.score);
+    const all = [filterA, filterB, validation, tooltip];
+    expect(pickStates(all, 3).map((p) => p.candidate.label)).toEqual(['Info', 'Confirm', 'Petrol']);
+    expect(pickStates(all, 2).map((p) => p.candidate.label)).toEqual(['Info', 'Confirm']);
+    expect(pickStates([filterA, filterB], 3).map((p) => p.candidate.label)).toEqual(['Petrol']);
   });
 });

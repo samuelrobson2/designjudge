@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ROOT } from '../src/config.ts';
 import { buildLayoutPacket, LAYOUT_PACKET_VERSION_FINDINGS } from '../src/categories/layout/packet.ts';
 import { promptConfig } from '../src/categories/layout/prompt.ts';
+import { stateName } from '../src/categories/layout/findings.ts';
 import { renderSystem, renderUserParts } from '../src/categories/layout/render.ts';
 import { parseLayoutRubric } from '../src/categories/layout/rubric.ts';
 import { mockProvider } from '../src/judge/providers/mock.ts';

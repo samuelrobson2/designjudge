@@ -1,0 +1,12 @@
+{
+  "description": "First Content Quality prompt: Typography v1's structure (fixed system prompt, the criteria in order) without any evidence blocks; the judge works from the request, screenshots of the desktop, phone, interactive and empty-content states, and those states' text as accessibility outlines.",
+  "rubric": "llm",
+  "rubricFile": "rubric.md",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5"
+}

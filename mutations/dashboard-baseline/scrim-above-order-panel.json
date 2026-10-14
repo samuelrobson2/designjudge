@@ -13,6 +13,6 @@
     "interaction": "Click an order in \"Recent orders\""
   },
   "severity": "severe",
-  "css": ".scrim { z-index: 1; }",
+  "css": ".scrim { z-index: 32; }",
   "js": null
 }

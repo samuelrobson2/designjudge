@@ -1,0 +1,11 @@
+{
+  "id": "title-wraps-narrow",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Page title squeezed into a narrow column",
+  "symptom": "The page title is limited to 9ch, so \"Book an appointment\" breaks into a short and a long line at every width.",
+  "where": {},
+  "severity": "minor",
+  "css": ".page__intro h1 { max-width: 9ch; }",
+  "js": null
+}

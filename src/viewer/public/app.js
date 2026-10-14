@@ -32,9 +32,18 @@ const HOSTED = !!window.DJ_HOSTED;
 function apiUrl(path) {
   if (!HOSTED || path.startsWith('human/')) return '/api/' + path;
   const [p, q] = path.split('?');
-  const v = new URLSearchParams(q ?? '').get('version');
-  return `/data/${p}${v ? `.${v}` : ''}.json`;
+  const params = new URLSearchParams(q ?? '');
+  const v = params.get('version');
+  const cat = params.get('category');
+  return `/data/${p}${cat && cat !== 'layout' ? `.${cat}` : ''}${v ? `.${v}` : ''}.json`;
 }
+
+// Ratings of every category but Layout live under the category's name, in the API, in the
+// downloads and in page links.
+const humanApi = (cat, caseId, ratingId) => ['human', cat === 'layout' ? null : cat, caseId, ratingId].filter(Boolean).join('/');
+const humanFiles = (cat) => `/files/human/${cat === 'layout' ? '' : `${cat}/`}`;
+const catParam = (cat) => (cat && cat !== 'layout' ? `cat=${cat}` : '');
+const withParams = (base, ...params) => (params.filter(Boolean).length ? `${base}?${params.filter(Boolean).join('&')}` : base);
 
 async function api(path) {
   const res = await fetch(apiUrl(path));
@@ -48,6 +57,17 @@ const fmtCost = (v) => (v === null || v === undefined ? '—' : `$${Number(v).to
 const fmtMs = (v) => (v === null || v === undefined ? '—' : v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`);
 const fmtDate = (s) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
 const imgSrc = (path) => `/files/evidence/${path}`;
+
+// How an interface is named and described on a category's pages (src/viewer/grid.ts), or null for
+// one never named. Case IDs only ever appear as small secondary text.
+const nameOf = (caseId, cat) => META.names?.[cat ?? 'layout']?.[caseId] ?? null;
+const labelOf = (caseId, cat) => nameOf(caseId, cat)?.label ?? caseId;
+const caseIdNote = (caseId) => h('code', { class: 'case-id' }, caseId);
+// A table cell's name, description and case ID for one interface.
+const caseCell = (caseId, cat, extra) => {
+  const n = nameOf(caseId, cat);
+  return [h('div', { class: 'case-cell__name' }, n?.label ?? caseId), n ? h('div', { class: 'small muted' }, n.description) : null, extra, n ? caseIdNote(caseId) : null];
+};
 
 // ---------- Modal and drawer ----------
 
@@ -109,7 +129,7 @@ function findEvidence(evidence, id) {
     ...(evidence.deterministic_findings ?? []),
     ...(evidence.failure_matrices ?? []),
     ...(evidence.quantitative_observations ?? []),
-    ...(evidence.criteria ?? []).flatMap((c) => c.diagnostic_evidence),
+    ...(evidence.criteria ?? []).flatMap((c) => c.diagnostic_evidence ?? []),
   ];
   for (const r of groups) {
     if (r.id === id) return { result: r };
@@ -375,7 +395,7 @@ function messageDoc(input) {
       i++;
     } else if (p.type === 'text') (shots.length ? trail : lead).push(p.text);
   }
-  const chunks = trail.join('\n\n').split(/(?=<criterion id=")|(?=<notes>)/);
+  const chunks = trail.join('\n\n').split(/(?=<criterion id=")|(?=<notes>)|(?=<page_text>)/);
   const sections = [
     [
       'system',
@@ -409,6 +429,7 @@ function messageDoc(input) {
     const crit = chunk.match(/^<criterion id="([A-Z])" name="([^"]+)">/);
     if (crit) sections.push([`crit-${crit[1]}`, `${crit[1]} · ${crit[2]}`, null, h('div', { class: 'panel panel--pad' }, messageText((carry + chunk).trim()))]), (carry = '');
     else if (chunk.startsWith('<notes>')) sections.push(['closing', 'Notes and closing', null, h('div', { class: 'panel panel--pad' }, messageText(chunk.trim()))]);
+    else if (chunk.startsWith('<page_text>')) sections.push(['page-text', 'Page text', null, h('div', { class: 'panel panel--pad' }, messageText(chunk.trim()))]);
     else carry += chunk;
   }
   if (input.schema) sections.push(['schema', 'Output schema', null, h('div', { class: 'panel panel--pad' }, h('details', { class: 'disclosure', style: { marginTop: 0 } }, h('summary', {}, 'Required JSON schema'), h('pre', {}, JSON.stringify(input.schema, null, 2))))]);
@@ -526,37 +547,67 @@ function inputStrip(input) {
 
 // ---------- Home ----------
 
-async function renderHome() {
-  const [cases, runs] = await Promise.all([api('cases'), api('runs')]);
+// One test of the grid: its slot, what it is, and links to rate and open it.
+function gridCard(test, c, cat) {
+  return h(
+    'div',
+    { class: 'card card--test', 'data-case': test.caseId },
+    h(
+      'div',
+      { class: 'card__text' },
+      h('h3', {}, c?.latest ? h('a', { href: withParams(`#/case/${test.caseId}`, catParam(cat.id)) }, `${test.slotName} Version`) : `${test.slotName} Version`),
+      h('p', { class: 'card__summary' }, test.description),
+    ),
+    h(
+      'div',
+      { class: 'card__foot' },
+      c?.latest ? h('a', { class: 'btn-primary btn-sm', href: withParams(`#/rate/${c.latest.interfaceId}`, catParam(cat.id)) }, 'Rate') : h('span', { class: 'muted' }, 'Not collected yet'),
+      c && (c.latest || !HOSTED) ? h('a', { class: 'btn-ghost btn-sm', href: `/site/${test.caseId}/`, target: '_blank' }, 'Open ↗') : null,
+    ),
+  );
+}
+
+// A product's desktop screenshot, taken from its Best test when collected, else from any collected test.
+function productPreview(p, byId) {
+  const order = ['best', 'baseline', 'flawed'];
+  const test = [...p.tests].sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot)).find((t) => byId.get(t.caseId)?.latest);
+  if (!test) return h('div', { class: 'product__thumb product__thumb--empty' }, 'Not collected yet');
+  const src = imgSrc(`${test.caseId}/${byId.get(test.caseId).latest.bundleId}/states/desktop/viewport.png`);
+  return h(
+    'button',
+    { type: 'button', class: 'product__thumb', title: 'Show a larger preview', onclick: () => openModal(h('img', { src, style: { maxWidth: '1280px', width: '100%' } })) },
+    h('img', { src, loading: 'lazy', alt: `Preview of ${p.name}` }),
+  );
+}
+
+// A category's home page lists the grid of test interfaces (grid.ts) and its own judge runs.
+async function renderHome(categoryId) {
+  const cat = categoryMeta(categoryId);
+  const [allCases, allRuns, robust] = await Promise.all([api('cases'), api('runs'), api(`robustness?category=${cat.id}`).catch(() => null)]);
+  const byId = new Map(allCases.map((c) => [c.caseId, c]));
+  const grid = META.grid?.[cat.id] ?? [];
+  const runs = allRuns.filter((r) => (r.category ?? 'layout') === cat.id);
   mount($app,
+    categoryPicker(cat.id, (id) => withParams('#/', catParam(id))),
     HOSTED
       ? h(
           'div',
           { class: 'page-head' },
           h('h1', {}, 'Rate these interfaces'),
-          h('p', {}, 'Each interface was built from a short prompt. Pick one, look through its screenshots and give its layout a score from 1 to 5. Ratings are public and show the name you enter.'),
+          h('p', {}, `Each interface was built from a short prompt. Choose what to rate, pick an interface, look through it and give its ${ratingCopy(cat.id).subject} a score from 1 to 5. Ratings are public and show the name you enter.`),
         )
       : null,
-    h('div', { class: 'section-title' }, h(HOSTED ? 'h2' : 'h1', {}, 'Test Interfaces'), h('span', { class: 'count' }, cases.length)),
-    h(
-      'div',
-      { class: 'cards' },
-      cases.map((c) =>
-        h(
-          'div',
-          { class: 'card' },
-          h('h3', {}, h('a', { href: `#/case/${c.caseId}` }, c.title)),
-          c.summary ? h('p', { class: 'card__summary' }, c.summary) : null,
-          h('p', { class: 'card__request' }, h('span', { class: 'card__label' }, 'Prompt: '), c.request),
-          h(
-            'div',
-            { class: 'card__foot' },
-            c.latest ? h('a', { class: 'btn-primary', href: `#/rate/${c.latest.interfaceId}` }, 'Rate this interface') : h('span', { class: 'muted' }, 'Not collected yet'),
-            h('a', { class: 'btn-ghost', href: `/site/${c.caseId}/`, target: '_blank' }, 'Open ↗'),
-          ),
-        ),
-      ),
-    ),
+    h('div', { class: 'section-title' }, h(HOSTED ? 'h2' : 'h1', {}, `${cat.name} test interfaces`), h('span', { class: 'count' }, grid.reduce((n, p) => n + p.tests.length, 0))),
+    grid.map((p) => {
+      const request = p.tests.map((t) => byId.get(t.caseId)?.request).find(Boolean);
+      return h(
+        'section',
+        { class: 'product', 'data-product': p.id },
+        h('h2', { class: 'product__name' }, p.name),
+        request ? h('p', { class: 'card__request' }, h('span', { class: 'card__label' }, 'Prompt: '), request) : null,
+        h('div', { class: 'product__body' }, productPreview(p, byId), h('div', { class: 'product__tests' }, p.tests.map((t) => gridCard(t, byId.get(t.caseId), cat)))),
+      );
+    }),
     h('div', { class: 'section-title' }, h(HOSTED ? 'h2' : 'h1', {}, 'Judge runs'), h('span', { class: 'count' }, runs.length)),
     runs.length
       ? h(
@@ -585,53 +636,125 @@ async function renderHome() {
             ),
           ),
         )
-      : h('p', { class: 'muted' }, 'No runs yet.'),
+      : h('p', { class: 'muted' }, `No ${cat.name} judge runs yet.`),
+    robustnessSection(robust, cat),
   );
+}
+
+const VERDICT_LABELS = { as_expected: 'as expected', not_as_expected: 'not as expected', needs_more_repeats: 'needs more repeats', insufficient: 'no valid scores' };
+
+// The category's planted single-defect tests on the Best interfaces, with the newest real judge
+// run of them. The variants are never shown as interfaces.
+function robustnessSection(data, cat) {
+  const head = h('div', { class: 'section-title' }, h(HOSTED ? 'h2' : 'h1', {}, 'Robustness tests'), data?.rows.length ? h('span', { class: 'count' }, data.rows.length) : null);
+  if (!data?.rows.length) return [head, h('p', { class: 'muted' }, `No ${cat.name} robustness tests have been judged yet.`)];
+  const fmt = (x) => (x === null || x === undefined ? '—' : Number(x).toFixed(2).replace(/\.?0+$/, ''));
+  const scores = (xs, mean) => h('span', {}, h('strong', {}, fmt(mean)), h('span', { class: 'faint small' }, ` (${xs.map((x) => x ?? '×').join(' ')})`));
+  const r = data.judgeRun;
+  return [
+    head,
+    h(
+      'p',
+      { class: 'robust__intro' },
+      `Each test plants one ${cat.name} problem in a Best interface (or, for “harmless” tests, a change that should not matter) and checks the judge's score moves the right way against the unchanged interface. `,
+      h('strong', { class: 'robust__summary' }, `${data.counts.asExpected} of ${data.counts.total} as expected.`),
+    ),
+    h('p', { class: 'meta' }, `Judged ${r.model}, effort ${r.effort}, prompt ${r.promptVersion} · run ${r.judgeRunId}`),
+    h(
+      'div',
+      { class: 'panel' },
+      h(
+        'table',
+        { class: 'robust' },
+        h('thead', {}, h('tr', {}, ['Product', 'Change', 'Expected score', 'Unchanged', 'With change', 'Verdict'].map((t) => h('th', {}, t)))),
+        h(
+          'tbody',
+          {},
+          data.rows.map((row) =>
+            h(
+              'tr',
+              { 'data-mutation': row.mutationId },
+              h('td', {}, row.product),
+              h('td', {}, h('div', {}, row.description), h('code', { class: 'case-id' }, row.mutationId)),
+              h('td', {}, row.direction),
+              h('td', {}, scores(row.controlScores, row.controlMean)),
+              h('td', {}, scores(row.variantScores, row.variantMean)),
+              h('td', {}, pill(row.verdict === 'as_expected' ? 'pass' : row.verdict === 'not_as_expected' ? 'fail' : 'outline', VERDICT_LABELS[row.verdict] ?? row.verdict)),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ];
 }
 
 // ---------- Interface ----------
 
-async function renderCase(caseId, tab, version) {
+// Display details for a category (criteria, name, prompt and rating versions); Layout when unknown.
+function categoryMeta(id) {
+  return META.categories?.[id ?? 'layout'] ?? { id: 'layout', name: 'Layout', criteria: META.criteria, promptVersions: META.promptVersions, ratingVersions: META.ratingVersions };
+}
+
+// The categories people can rate (or, with all, every category), as links in the server's
+// category order.
+function categoryPicker(current, hrefFor, { all = false } = {}) {
+  const cats = Object.values(META.categories ?? {}).filter((c) => all || c.ratingVersions?.length);
+  if (cats.length < 2) return null;
+  return h(
+    'nav',
+    { class: 'cat-picker', 'aria-label': 'Category' },
+    h('div', { class: 'cat-picker__options' }, cats.map((c) => h('a', { href: hrefFor(c.id), class: c.id === current ? 'active' : '', 'aria-current': c.id === current ? 'page' : null }, c.name))),
+  );
+}
+
+async function renderCase(caseId, tab, version, categoryId) {
+  const ratedCat = categoryMeta(categoryId);
   const [data, human] = await Promise.all([
     api(`case/${caseId}`),
-    api(`human/${caseId}`).catch((err) => ({ error: err.message, latestBundleId: null, ratings: [], judge: [] })),
+    api(humanApi(ratedCat.id, caseId)).catch((err) => ({ error: err.message, latestBundleId: null, ratings: [], judge: [] })),
   ]);
   const { summary, bundle } = data;
+  const name = nameOf(caseId, ratedCat.id);
   const tabs = [
-    ['human', `Human ratings (${human.ratings.length})`],
+    ['human', `Ratings (${human.ratings.length})`],
     ['evidence', 'What the judge sees'],
     ['states', 'All captured states'],
     ['code', 'Code'],
   ];
   const body = h('div');
   mount($app,
-    h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Test Interfaces'), ' / ', caseId),
+    categoryPicker(ratedCat.id, (id) => withParams(`#/case/${caseId}`, tab === 'human' ? null : `tab=${tab}`, catParam(id))),
+    h('div', { class: 'crumbs' }, h('a', { href: withParams('#/', catParam(ratedCat.id)) }, `${ratedCat.name} test interfaces`), ' / ', name?.label ?? caseId),
     h(
       'div',
       { class: 'page-head' },
       h(
         'div',
         { class: 'row' },
-        h('h1', {}, summary.title),
+        h('h1', {}, name?.label ?? caseId),
         h('span', { class: 'spacer' }),
         h('a', { class: 'btn-ghost', href: `/site/${caseId}/`, target: '_blank' }, 'Open interface ↗'),
-        summary.latest ? h('a', { class: 'btn-primary', href: `#/rate/${summary.latest.interfaceId}` }, 'Rate interface') : null,
+        summary.latest ? h('a', { class: 'btn-primary', href: withParams(`#/rate/${summary.latest.interfaceId}`, catParam(ratedCat.id)) }, 'Rate interface') : null,
       ),
-      summary.summary ? h('p', {}, summary.summary) : null,
-      h('p', { class: 'meta' }, `Collected ${fmtDate(bundle.createdAt)} · ${bundle.browser.name} ${bundle.browser.version} · shown to the judge as ${bundle.interfaceId}`),
+      name ? h('p', { class: 'case-description' }, name.description) : null,
+      h('p', { class: 'meta' }, `Collected ${fmtDate(bundle.createdAt)} · ${bundle.browser.name} ${bundle.browser.version} · shown to the judge as ${bundle.interfaceId} · `, caseIdNote(caseId)),
     ),
-    h('nav', { class: 'tabs' }, tabs.map(([id, label]) => h('a', { href: `#/case/${caseId}?tab=${id}`, class: tab === id ? 'active' : '' }, label))),
+    h('nav', { class: 'tabs' }, tabs.map(([id, label]) => h('a', { href: withParams(`#/case/${caseId}`, `tab=${id}`, catParam(ratedCat.id)), class: tab === id ? 'active' : '' }, label))),
     body,
   );
   if (tab === 'evidence') {
-    const v = version && META.promptVersions.includes(version) ? version : META.promptVersions.at(-1);
-    const input = await api(`prompt/${caseId}/${bundle.bundleId}?version=${v}`);
+    const cat = categoryMeta(categoryId);
+    const versions = cat.promptVersions;
+    const v = version && versions.includes(version) ? version : versions.at(-1);
+    const input = await api(`prompt/${caseId}/${bundle.bundleId}?category=${cat.id}&version=${v}`);
+    const link = (c, pv) => `#/case/${caseId}?tab=evidence&cat=${c}${pv ? `&v=${pv}` : ''}`;
+    const tabStyle = { width: 'auto', padding: '0 10px' };
     body.append(
       h(
         'div',
         { class: 'row', style: { marginBottom: '12px' } },
         h('span', { class: 'small muted' }, 'Prompt version'),
-        h('div', { class: 'repeats' }, META.promptVersions.map((pv) => h('a', { href: `#/case/${caseId}?tab=evidence&v=${pv}`, class: pv === v ? 'active' : '', style: { width: 'auto', padding: '0 10px' } }, pv))),
+        h('div', { class: 'repeats' }, versions.map((pv) => h('a', { href: link(cat.id, pv), class: pv === v ? 'active' : '', style: tabStyle }, pv))),
         h('span', { class: 'small muted' }, input.promptDescription ?? ''),
       ),
       inputStrip(input),
@@ -640,10 +763,18 @@ async function renderCase(caseId, tab, version) {
   }
   if (tab === 'states') body.append(renderAllStates(data, await api(`checkmarks/${caseId}/${bundle.bundleId}`)));
   if (tab === 'code') body.append(renderCode(caseId, data.codeFiles));
-  if (tab === 'human') body.append(humanRatingsTab(caseId, human, summary.latest?.interfaceId));
+  if (tab === 'human') {
+    body.append(humanRatingsTab(caseId, human, summary.latest?.interfaceId, ratedCat.id));
+  }
 }
 
-function renderAllStates({ bundle, diagnostics }, checkmarks = {}) {
+function renderAllStates({ bundle, diagnostics, shownStates = [] }, checkmarks = {}) {
+  const attemptPill = (d, a) => {
+    if (shownStates.some((s) => s.viewportId === d.viewport && s.selector === a.selector)) return pill('pass', 'shown');
+    if ([d.chosen, ...(d.alsoKept ?? [])].some((k) => k && k.selector === a.selector)) return pill('observed', 'checked only');
+    if (a.outcome === 'changed') return h('span', { title: 'The screen matched one already kept, or three were kept already' }, pill('na', 'not kept'));
+    return null;
+  };
   const byKey = new Map((diagnostics?.results ?? []).map((r) => [r.key, r]));
   const checks = ['region_overlap', 'container_overflow', 'page_horizontal_overflow', 'interactive_reachability', 'collapsed_dimensions', 'occluded_content'];
   const src = (p) => `/files/evidence/${bundle.caseId}/${bundle.bundleId}/${p}`;
@@ -701,7 +832,11 @@ function renderAllStates({ bundle, diagnostics }, checkmarks = {}) {
           'div',
           { class: 'panel panel--pad', style: { marginBottom: '20px' } },
           h('h3', {}, 'Interactive states found automatically'),
-          h('p', { class: 'small muted', style: { margin: '4px 0 10px' } }, 'Each distinct control was clicked on a fresh page. The three largest layout changes at each viewport are checked; the judge sees screenshots of the largest one at desktop and mobile.'),
+          h(
+            'p',
+            { class: 'small muted', style: { margin: '4px 0 10px' } },
+            'Each distinct control was clicked on a fresh page. Up to three clicks per viewport that each led to a different screen are kept, preferring those that opened or announced something, then the largest changes. Every judge sees screenshots of all of them at desktop and phone; at tablet they are checked only. Functionality also sees up to two states reached by a second click or by applying several choices, and the screen after each form is submitted.',
+          ),
           discovery.map((d) =>
             h(
               'details',
@@ -722,7 +857,7 @@ function renderAllStates({ bundle, diagnostics }, checkmarks = {}) {
                         'td',
                         {},
                         `${a.role} “${a.label}”`,
-                        d.chosen && a.selector === d.chosen.selector ? pill('pass', 'chosen') : (d.alsoKept ?? []).some((k) => k.selector === a.selector) ? pill('observed', 'also checked') : null,
+                        attemptPill(d, a),
                       ),
                       h('td', {}, a.outcome.replace(/_/g, ' ')),
                       h('td', { class: 'num' }, a.score),
@@ -810,12 +945,12 @@ async function renderRun(runId) {
   const { run, report } = await api(`run/${runId}`);
   const t = run.totals;
   mount($app,
-    h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Runs'), ' / ', runId),
+    h('div', { class: 'crumbs' }, h('a', { href: withParams('#/', catParam(run.category)) }, 'Runs'), ' / ', runId),
     h(
       'div',
       { class: 'page-head' },
       h('h1', {}, `${run.model} · ${run.repeats} repeats`),
-      h('p', { class: 'meta' }, `${fmtDate(run.createdAt)} · ${run.provider} · effort ${run.effort} · prompt ${run.promptVersion} (${run.promptHash})${run.label ? ` · ${run.label}` : ''}`),
+      h('p', { class: 'meta' }, `${fmtDate(run.createdAt)} · ${categoryMeta(run.category).name} · ${run.provider} · effort ${run.effort} · prompt ${run.promptVersion} (${run.promptHash})${run.label ? ` · ${run.label}` : ''}`),
       t ? h('p', { class: 'meta' }, `${t.ok}/${t.calls} valid outputs · ${fmtCost(t.costUsd)} · average ${fmtMs(t.latencyMsMean)} per call · `, h('a', { href: `/files/runs/${runId}/summary.csv` }, 'summary.csv'), ' · ', h('a', { href: `/files/runs/${runId}/checks.csv` }, 'checks.csv'), ' · ', h('a', { href: `/files/runs/${runId}/findings.csv` }, 'findings.csv'), ' · ', h('a', { href: `/files/runs/${runId}/points.csv` }, 'points.csv')) : null,
     ),
     run.provider === 'mock' ? h('div', { class: 'notice' }, 'Mock provider: these results test the harness only. They say nothing about judge quality.') : null,
@@ -833,7 +968,7 @@ async function renderRun(runId) {
             h(
               'tr',
               {},
-              h('td', {}, h('div', {}, c.caseId), c.baseline ? h('div', { class: 'small faint' }, `variant of ${c.baseline}`) : null),
+              h('td', {}, caseCell(c.caseId, run.category, c.baseline ? h('div', { class: 'small faint' }, `compared with ${c.baseline.split(', ').map((b) => labelOf(b, run.category)).join(', ')}`) : null)),
               h('td', {}, h('div', { class: 'repeats' }, c.scores.map((s, i) => h('a', { href: `#/judgment/${runId}/${c.caseId}/${i + 1}`, title: `Repeat ${i + 1}` }, s ?? '×')))),
               h('td', { class: 'num' }, c.mean ?? '—'),
               h('td', { class: 'num' }, c.sd ?? '—'),
@@ -843,38 +978,6 @@ async function renderRun(runId) {
         ),
       ),
     ),
-    report.pairs.length
-      ? h(
-          'div',
-          { style: { marginTop: '40px' } },
-          h('div', { class: 'section-title' }, h('h2', {}, 'Baseline vs. variant'), h('span', { class: 'count small' }, 'expected outcomes are hidden from the judge')),
-          h(
-            'div',
-            { class: 'panel' },
-            h(
-              'table',
-              {},
-              h('thead', {}, h('tr', {}, h('th', {}, 'Pair'), h('th', {}, 'Expected'), h('th', { class: 'num' }, 'Δ mean'), h('th', { class: 'num' }, 'Variant lower'), h('th', {}, 'Result'), h('th', {}, 'Planted check cited'))),
-              h(
-                'tbody',
-                {},
-                report.pairs.map((p) =>
-                  h(
-                    'tr',
-                    {},
-                    h('td', {}, h('div', {}, `${p.baseline} → ${p.variant}`), h('div', { class: 'small muted', style: { maxWidth: '520px' } }, p.change)),
-                    h('td', {}, (p.expected ?? '').replace(/_/g, ' ')),
-                    h('td', { class: 'num' }, p.delta ?? '—'),
-                    h('td', { class: 'num' }, p.pLower === null ? '—' : `${Math.round(p.pLower * 100)}%`),
-                    h('td', {}, pill(p.verdict === 'as_expected' ? 'pass' : p.verdict === 'not_as_expected' ? 'fail' : 'na', p.verdict.replace(/_/g, ' '))),
-                    h('td', {}, p.detection.citedTargetCheck === null ? h('span', { class: 'faint' }, 'no check targets this') : `${p.detection.citedTargetCheck} of ${p.detection.repeats}`),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        )
-      : '',
     h(
       'details',
       { class: 'disclosure', style: { marginTop: '28px' } },
@@ -893,7 +996,7 @@ async function renderRun(runId) {
               h(
                 'tr',
                 {},
-                h('td', {}, c.caseId),
+                h('td', {}, labelOf(c.caseId, run.category), ' ', caseIdNote(c.caseId)),
                 h('td', { class: 'num' }, c.inputTokensMean.toLocaleString()),
                 h('td', { class: 'num' }, c.cachedTokensMean.toLocaleString()),
                 h('td', { class: 'num' }, c.outputTokensMean.toLocaleString()),
@@ -919,18 +1022,19 @@ async function renderJudgment(runId, caseId, repeat, tab) {
   const o = j.output;
   const body = h('div');
   mount($app,
-    h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Runs'), ' / ', h('a', { href: `#/run/${runId}` }, `${j.model} run`), ' / ', caseId),
+    h('div', { class: 'crumbs' }, h('a', { href: withParams('#/', catParam(j.category)) }, 'Runs'), ' / ', h('a', { href: `#/run/${runId}` }, `${j.model} run`), ' / ', labelOf(caseId, j.category)),
     h(
       'div',
       { class: 'page-head' },
       h(
         'div',
         { class: 'row' },
-        h('h1', {}, caseId),
+        h('h1', {}, labelOf(caseId, j.category)),
         h('span', { class: 'spacer' }),
         h('div', { class: 'repeats' }, Array.from({ length: repeats }, (_, i) => h('a', { href: `${base}/${i + 1}?tab=${tab}`, class: String(i + 1) === String(repeat) ? 'active' : '' }, `r${i + 1}`))),
       ),
-      h('p', { class: 'meta' }, `${j.model} · effort ${j.effort} · prompt ${j.promptVersion} · ${fmtMs(j.latencyMs)} · ${fmtCost(j.costUsd)}${j.usage ? ` · ${j.usage.inputTokens.toLocaleString()} input (${j.usage.cachedInputTokens.toLocaleString()} cached), ${j.usage.outputTokens.toLocaleString()} output tokens` : ''}`),
+      nameOf(caseId, j.category) ? h('p', { class: 'case-description' }, nameOf(caseId, j.category).description) : null,
+      h('p', { class: 'meta' }, caseIdNote(caseId), ` · ${j.model} · effort ${j.effort} · prompt ${j.promptVersion} · ${fmtMs(j.latencyMs)} · ${fmtCost(j.costUsd)}${j.usage ? ` · ${j.usage.inputTokens.toLocaleString()} input (${j.usage.cachedInputTokens.toLocaleString()} cached), ${j.usage.outputTokens.toLocaleString()} output tokens` : ''}`),
     ),
     j.provider === 'mock' ? h('div', { class: 'notice' }, 'Mock provider output. It tests the harness only.') : null,
     h(
@@ -973,6 +1077,7 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
   const index = request?.evidenceIndex ?? {};
   const decisive = new Set(o.overall.decisive_finding_ids ?? []);
   const issues = validation?.refIssues ?? [];
+  const category = categoryMeta(request?.category);
   let openChip = null;
 
   const showEvidence = (ref, chip) => {
@@ -985,6 +1090,10 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
     if (img) {
       const entry = evidence?.screenshots?.find((s) => s.id === ref) ?? { id: ref, shows: img.caption };
       return openDrawer(ref, screenshotView(entry, img), onClose);
+    }
+    if (index[ref].type === 'page_text') {
+      const block = (evidence?.page_text ?? []).find((b) => b.id === ref);
+      return openDrawer(ref, block ? h('pre', {}, [block.heading, ...block.lines].join('\n')) : h('p', { class: 'muted' }, 'Not found in the evaluation material.'), onClose);
     }
     const found = evidence ? findEvidence(evidence, ref) : null;
     if (!found) return openDrawer(ref, h('p', { class: 'muted' }, 'Not found in the evaluation material.'), onClose);
@@ -1012,7 +1121,7 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
     h(
       'div',
       { class: 'panel panel--pad' },
-      h('div', { class: 'score-head' }, h('div', { class: 'score' }, o.overall.score), h('div', {}, h('div', { class: 'score-label' }, o.overall.anchor), h('div', { class: 'small muted' }, 'Holistic Layout score (1–5)'))),
+      h('div', { class: 'score-head' }, h('div', { class: 'score' }, o.overall.score), h('div', {}, h('div', { class: 'score-label' }, o.overall.anchor), h('div', { class: 'small muted' }, `Holistic ${category.name} score (1–5)`))),
       h('p', { class: 'reasoning' }, o.overall.reasoning),
       // The model's own summary of its reasoning, as returned by the provider.
       showTrace
@@ -1044,7 +1153,7 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
     h(
       'div',
       { class: 'panel', style: { marginTop: '20px' } },
-      META.criteria.map((c) => {
+      category.criteria.map((c) => {
         const cr = o.criteria[c.id];
         return h(
           'div',
@@ -1106,7 +1215,29 @@ function judgmentPanels(o, { validation, reasoningSummary, request, showTrace })
 // rather than separate fields. Raters don't add findings; only the score is required.
 
 const RATER_KEY = 'dj-rater';
-const draftKey = (caseId, bundleId, v) => `dj-rate:${caseId}:${bundleId}:${v}`;
+const draftKey = (caseId, bundleId, v, cat) => (cat === 'layout' ? `dj-rate:${caseId}:${bundleId}:${v}` : `dj-rate:${cat}:${caseId}:${bundleId}:${v}`);
+
+// How the rating pages name what is being rated, and what to make of the pseudo-translated
+// "Longer text" content.
+const RATING_COPY = {
+  layout: { subject: 'layout', serves: 'how well the layout serves it', whole: 'the whole layout', longer: 'Judge the layout, not the words.' },
+  typography: { subject: 'typography', serves: 'how well the typography serves it', whole: 'the typography as a whole', longer: 'Judge the typography, not the words.' },
+  task_fit: { subject: 'task fit', serves: 'how well the interface fits the task it asks for', whole: 'how well the interface fits the task', longer: 'Judge how well it fits the task, not the words.' },
+  content_quality: {
+    subject: 'content',
+    serves: 'how well the words and images on screen serve it',
+    whole: 'the content as a whole',
+    longer: 'That wording is deliberate, so judge the real wording under “Typical content”.',
+  },
+  visual_system: {
+    subject: 'visual system',
+    serves: 'how well the colours, components and interaction states serve it',
+    whole: 'the visual system as a whole',
+    longer: 'Judge the visual system, not the words.',
+  },
+  functionality: { subject: 'functionality', serves: 'how well the interface actually works for it', whole: 'how well the interface works as a whole', longer: 'Judge whether it works, not the words.' },
+};
+const ratingCopy = (cat) => RATING_COPY[cat] ?? { subject: 'interface', serves: 'how well the interface serves it', whole: 'the whole interface', longer: '' };
 const humanize = (key) => key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
 const joinAnd = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
@@ -1190,9 +1321,12 @@ function shotGallery(images, open, title = 'Screenshots') {
 }
 
 // One criterion's evidence as the judge receives it, with each check issue and each measured
-// value laid out the same way: what, where, and which screenshots show it.
-function criterionEvidence(ev, images) {
-  const imgById = new Map(images.map((i) => [i.id, i]));
+// value laid out the same way: what, where, and which screenshots show it. `sheets` are images
+// drawn from the measurements (Typography's specimen sheets), shown for the values that name them.
+function criterionEvidence(ev, images, sheets = []) {
+  const imgById = new Map([...images, ...sheets].map((i) => [i.id, i]));
+  const sheetIds = new Set(sheets.map((i) => i.id));
+  const valueShots = (l) => [...shotsShowing(l, images), ...(l.shots ?? []).filter((id) => sheetIds.has(id))];
   const chips = (ids) =>
     ids.length
       ? h('span', { class: 'chips chips--inline' }, ids.map((id) => (imgById.has(id) ? h('button', { type: 'button', class: 'chip', onclick: () => openShot(imgById.get(id)) }, id) : h('code', {}, id))))
@@ -1237,7 +1371,7 @@ function criterionEvidence(ev, images) {
               { class: 'ev-block' },
               h('p', {}, h('strong', {}, b.observation), h('span', { class: 'muted' }, ` measures ${b.measures}.`)),
               h('p', { class: 'small muted' }, `Rubric reference: ${b.reference}`),
-              b.lines.map((l) => entry(h('span', { class: 'marker marker--value' }, 'Value'), l, chips(shotsShowing(l, images)))),
+              b.lines.map((l) => entry(h('span', { class: 'marker marker--value' }, 'Value'), l, chips(valueShots(l)))),
             ),
           )
         : h('p', { class: 'muted' }, 'All within the reference for this criterion.'),
@@ -1245,29 +1379,121 @@ function criterionEvidence(ev, images) {
   ];
 }
 
-// Each evaluation point as a question for the rater. Points not listed fall back to the rubric's
-// definition.
+// Each evaluation point as a question for the rater, per category. Points not listed fall back
+// to the rubric's definition.
 const POINT_PROMPTS = {
-  primary_focus: 'Is the main task, and the main action, obvious straight away?',
-  task_aligned_order: 'Does content come in order of importance, with the main task first?',
-  grouping: 'Are related things grouped together, and separate groups clearly apart?',
-  alignment: 'Do things line up on shared edges, with consistent spacing?',
-  structural_restraint: 'Does it rely on spacing and alignment, rather than extra boxes, cards and dividers?',
-  focused_composition: 'Is everything on the page needed for the task?',
-  appropriate_density: 'Is the amount of information right for the task: not too sparse, not too crowded?',
-  efficient_use_of_space: 'Is space used well, without oversized areas, repetition or needless scrolling?',
-  clutter_control: 'Is secondary information tucked away or simplified where it would get in the way?',
-  content_fit: 'Do labels, values, tables and lists have room to stay readable? Try “Longer text” and “Lots of content”.',
-  usable_sizing: 'Does each main area and component get enough space to do its job?',
-  functional_proportion: 'Do widths, heights and shapes suit what each component holds?',
-  compositional_balance: 'Do the main and supporting areas feel balanced, with nothing accidentally huge, tiny or empty?',
-  peer_consistency: 'Are similar components the same size and shape?',
-  structural_integrity: 'Does anything overlap, get cut off, collapse or crowd the edges?',
-  adaptive_behavior: 'On a smaller screen, do things stack, resize or simplify sensibly? Try Tablet and Phone.',
-  growth_resilience: 'Does the layout hold up with lots of data or longer text?',
-  priority_preservation: 'Do the important things stay prominent on smaller screens and with more content?',
-  reachability: 'Can you still reach the key content and actions on a phone, or when the page is full?',
-  scroll_behavior: 'Is any extra scrolling or hiding on small screens deliberate and easy to find?',
+  layout: {
+    primary_focus: 'Is the main task, and the main action, obvious straight away?',
+    task_aligned_order: 'Does content come in order of importance, with the main task first?',
+    grouping: 'Are related things grouped together, and separate groups clearly apart?',
+    alignment: 'Do things line up on shared edges, with consistent spacing?',
+    structural_restraint: 'Does it rely on spacing and alignment, rather than extra boxes, cards and dividers?',
+    focused_composition: 'Is everything on the page needed for the task?',
+    appropriate_density: 'Is the amount of information right for the task: not too sparse, not too crowded?',
+    efficient_use_of_space: 'Is space used well, without oversized areas, repetition or needless scrolling?',
+    clutter_control: 'Is secondary information tucked away or simplified where it would get in the way?',
+    content_fit: 'Do labels, values, tables and lists have room to stay readable? Try “Longer text” and “Lots of content”.',
+    usable_sizing: 'Does each main area and component get enough space to do its job?',
+    functional_proportion: 'Do widths, heights and shapes suit what each component holds?',
+    compositional_balance: 'Do the main and supporting areas feel balanced, with nothing accidentally huge, tiny or empty?',
+    peer_consistency: 'Are similar components the same size and shape?',
+    structural_integrity: 'Does anything overlap, get cut off, collapse or crowd the edges?',
+    adaptive_behavior: 'On a smaller screen, do things stack, resize or simplify sensibly? Try Tablet and Phone.',
+    growth_resilience: 'Does the layout hold up with lots of data or longer text?',
+    priority_preservation: 'Do the important things stay prominent on smaller screens and with more content?',
+    reachability: 'Can you still reach the key content and actions on a phone, or when the page is full?',
+    scroll_behavior: 'Is any extra scrolling or hiding on small screens deliberate and easy to find?',
+  },
+  typography: {
+    role_distinction: 'Can you tell titles, headings, body text, labels and values apart at a glance?',
+    hierarchical_progression: 'Does text get less prominent as it gets less important, with nothing minor overpowering what it belongs to?',
+    task_aligned_emphasis: 'Does the strongest emphasis go to what matters most for the task?',
+    economy_of_emphasis: 'Is the hierarchy made with a few sizes and weights, rather than lots of variation?',
+    readable_sizing: 'Is each piece of text big enough for its role, with nothing important uncomfortably small?',
+    appropriate_weight: 'Is text clear without looking faint or needlessly heavy?',
+    line_height: 'Is the space between lines comfortable: tighter for short headings, roomier for paragraphs?',
+    measure: 'Are lines of running text a comfortable length, neither too wide nor too narrow?',
+    multi_line_treatment: 'Do headings and longer text wrap neatly, without a stray word on its own line?',
+    scale_coherence: 'Do the font sizes feel like a small, deliberate set rather than many slightly different ones?',
+    role_consistency: 'Does the same kind of text look the same everywhere it appears?',
+    typeface_restraint: 'Are only a few typefaces used, each for a clear reason?',
+    weight_restraint: 'Is a small set of weights used, each with a clear purpose?',
+    responsive_adaptation: 'Does text resize and rewrap sensibly on smaller screens? Try Tablet and Phone.',
+    hierarchy_preservation: 'Do headings stay clearly distinct from body text on smaller screens?',
+    reading_preservation: 'On a phone, is text still comfortable to read: not too small, cramped or oddly wrapped? Try “Longer text” too.',
+  },
+  task_fit: {
+    core_intent: 'Does the main workflow do what the person is actually trying to get done?',
+    interface_choice: 'Are the controls, and the way you use them, a good fit for this kind of task?',
+    task_priority: 'Is the main task obvious straight away, rather than pushed aside by secondary things?',
+    explicit_requirements: 'Is everything the prompt asked for actually there?',
+    necessary_support: 'Is anything missing that you would need to finish the task?',
+    priority: 'Do the things the prompt asked for get more prominence than optional extras?',
+    relevant_scope: 'Does every feature and section help with the task?',
+    restraint: 'Does it avoid inventing workflows, settings or features nobody asked for?',
+    appropriate_defaults: 'Where the prompt was vague, did it make simple, sensible choices rather than adding complexity?',
+    domain_relevance: 'Do the objects, fields, words and actions fit this domain?',
+    specificity: 'Is the content concrete enough to make the interface understandable and useful?',
+    no_unsupported_fabrication: 'Are made-up facts or figures presented as if the person had supplied them?',
+  },
+  content_quality: {
+    clear_language: 'Are labels, instructions and messages written in plain, familiar words?',
+    action_clarity: 'Is it clear what each button and link will do?',
+    useful_guidance: 'Do instructions tell you what you need to know or do, rather than describe the interface?',
+    state_communication: 'Do empty, error and validation messages explain what happened and what to do next? Try submitting with things missing, and the “Empty” content.',
+    specificity: 'Is the copy concrete and about this task, rather than vague, generic or promotional?',
+    necessity: 'Does every heading, description and helper message tell you something you need?',
+    redundancy: 'Is anything said twice where once would do?',
+    proportion: 'Is the amount of explanation right for how complex and important the task is?',
+    terminology: 'Are the same things called by the same names throughout?',
+    voice_and_tone: 'Does the writing keep one voice, with a tone that suits each moment?',
+    structural_restraint: 'Does it avoid unnecessary introductions, headings, summaries or extra sections?',
+    purpose: 'Do images add useful context or identity rather than decoration? If there are none and none are needed, that is fine.',
+    relevance: 'Do the images show things that fit the content?',
+    framing: 'Are images cropped and sized so the important part is visible?',
+    quality: 'Do images look sharp, without stretching or blurring?',
+    coherence: 'Do images doing the same job look like they belong to one set?',
+  },
+  visual_system: {
+    palette_coherence: 'Do the colours feel like one deliberate palette, rather than many slightly different shades?',
+    visual_hierarchy: 'Do accent and status colours make the important things stand out, without secondary things competing for attention?',
+    semantic_consistency: 'Does each colour keep one meaning throughout, for example for links, selection, success, warnings and errors?',
+    purposeful_emphasis: 'Is strong, filled colour kept for the few things that really need to stand out?',
+    perceptual_contrast: 'Is all text, and every control, easy to tell apart from its background, including small and secondary text?',
+    component_consistency: 'Do buttons, inputs, cards, badges and other repeated components that do the same job look the same?',
+    surface_hierarchy: 'Do backgrounds, borders and shadows make it clear which surfaces belong together, without needless layers?',
+    shape_coherence: 'Do corner roundness and shapes come from a small, consistent set, with shapes inside others fitting them?',
+    icon_coherence: 'Do the icons look like one family, with the same style, size and weight? If there are none and none are needed, that is fine.',
+    optical_alignment: 'Do icons and other uneven shapes look centred and lined up with the text and controls next to them?',
+    detail_restraint: 'Does each border, shadow and effect have a purpose, rather than adding visual noise?',
+    state_distinction: 'Can you tell when something is hovered, focused, pressed, selected or disabled? Try hovering, clicking and the Tab key.',
+    state_consistency: 'Do similar controls show the same states in the same way?',
+    focus: 'Press Tab to move through the page. Can you always see clearly where you are?',
+    accessible_semantics: 'Does each control say what it is and does, with a visible label that matches? The automated checks report what assistive technology is told.',
+    targeting: 'Are buttons and links big enough, and far enough apart, to hit easily? Try Phone.',
+    redundant_meaning: 'Is selection, status or an error shown by more than colour alone, such as a label, icon or shape?',
+    motion_restraint: 'Does any animation help you follow what changed, without distracting from the task? If there is none, that is fine.',
+    reduced_motion: 'With reduced motion turned on in your system settings, does non-essential animation stop? Skip this if there is no animation.',
+  },
+  functionality: {
+    end_to_end_completion: 'Can you actually finish the main task, from start to end?',
+    meaningful_outcome: 'When you finish, do you get the real result the prompt implies, not just a screen that looks finished?',
+    path_continuity: 'Does every step lead somewhere, without dead ends, buttons that do nothing or half-finished screens?',
+    primary_path_reliability: 'Does the main task work every time, without a workaround? Try it more than once.',
+    control_behavior: 'Do buttons, links, fields, menus and toggles do what they look and say they will?',
+    input_handling: 'Are the values you type or choose accepted and used correctly?',
+    consistency: 'Do controls that look the same behave the same everywhere?',
+    predictability: 'Before you click, can you tell what will happen? Afterwards, is it clear what did?',
+    state_accuracy: 'Do your selections, edits, filters and submissions show up correctly on screen?',
+    data_consistency: 'Does the same item or number match everywhere it appears?',
+    derived_results: 'Do totals, counts, summaries and charts update correctly when you change what they are based on?',
+    no_simulated_success: 'Are any results fixed or made up, but shown as if your action produced them?',
+    persistence_where_needed: 'Is what you entered or chose kept as you move between steps, where the task needs it?',
+    action_feedback: 'After each action, can you tell whether it is working, worked, failed or changed something?',
+    validation: 'If you leave something out or enter something wrong, are you told clearly and able to fix it? Try submitting with things missing.',
+    failure_handling: 'When something goes wrong, does it say so, rather than look successful or leave you unsure what happened?',
+    recovery: 'Can you go back, change, undo, retry or reset where the task needs it?',
+  },
 };
 
 // Dictation into a text box, using the browser's speech recognition. Only one runs at a time.
@@ -1407,17 +1633,42 @@ function liveViewer(caseId, fixtures) {
   new ResizeObserver(fit).observe(stage);
   window.addEventListener('resize', fit);
   draw();
+  // A failed or redirected page (a login page, say) would otherwise show in the frame as if it were the interface.
+  fetch(src(), { redirect: 'manual' })
+    .then((r) => {
+      if (r.ok) return;
+      stage.replaceWith(
+        h(
+          'div',
+          { class: 'notice live__blocked' },
+          `The live interface couldn't be loaded at this address (${r.status ? `the server answered ${r.status}` : 'it was redirected'}). Try `,
+          h('a', { href: src(), target: '_blank', rel: 'noopener' }, 'opening the interface in a new tab'),
+          ', or open the site at its public address. The screenshots are unaffected.',
+        ),
+      );
+      sizeNote.textContent = '';
+    })
+    .catch(() => {});
   return root;
 }
 
-// Screenshots with a failed check outlined, for one criterion (or all criteria).
+// Screenshots with a failed check outlined, for one criterion (or all criteria). Categories
+// without automated checks have none.
 function failureShots(input, cid) {
   const ids = new Set(
     input.evidence.criteria
       .filter((c) => !cid || c.criterion === cid)
-      .flatMap((c) => c.checks.flatMap((b) => b.issues.flatMap((l) => l.marked_in ?? []))),
+      .flatMap((c) => (c.checks ?? []).flatMap((b) => b.issues.flatMap((l) => l.marked_in ?? []))),
   );
   return input.images.filter((img) => ids.has(img.id));
+}
+
+// Sheets the judge is sent that raters also see on every criterion page, per category, by image ID prefix.
+const RATER_SHEETS = { visual_system: { title: 'Palette and controls in each state', prefixes: ['S-palette', 'S-controls'] } };
+
+function raterSheets(input, cat) {
+  const sheets = RATER_SHEETS[cat];
+  return sheets ? { title: sheets.title, images: input.images.filter((img) => sheets.prefixes.some((p) => img.id.startsWith(p))) } : null;
 }
 
 // Form controls bound to the draft. `changed(structural)` saves; structural changes redraw the form.
@@ -1471,23 +1722,23 @@ function formKit(input, draft, changed) {
   return { stateIds, field, textArea, voiceText, seg, checkList, control };
 }
 
-function criterionForm(kit, input, draft, cid, changed) {
-  const criterion = META.criteria.find((c) => c.id === cid);
+function criterionForm(kit, cat, draft, cid) {
+  const criterion = cat.criteria.find((c) => c.id === cid);
   const c = draft.criteria[cid];
   return [
     h(
       'div',
       { class: 'form-section' },
       h('h3', {}, 'Your notes'),
-      h('ul', { class: 'prompts' }, criterion.points.map((p) => h('li', { title: `${p.name}: ${p.definition}` }, POINT_PROMPTS[p.key] ?? `${p.name}: ${p.definition}`))),
+      h('ul', { class: 'prompts' }, criterion.points.map((p) => h('li', { title: `${p.name}: ${p.definition}` }, POINT_PROMPTS[cat.id]?.[p.key] ?? `${p.name}: ${p.definition}`))),
       kit.voiceText(c, 'summary', 9, 'What works, what doesn’t, and where you saw it.'),
     ),
   ];
 }
 
 // What the rater wrote on the criterion pages, for the final judgement.
-function wroteSummary(draft, go) {
-  return META.criteria.map((criterion) => {
+function wroteSummary(cat, draft, go) {
+  return cat.criteria.map((criterion) => {
     const c = draft.criteria[criterion.id];
     // Per-point notes only exist in drafts started before the form took one note per criterion.
     const notes = criterion.points.filter((p) => c.evaluation_points[p.key].assessment.trim());
@@ -1517,16 +1768,19 @@ function wroteSummary(draft, go) {
   });
 }
 
-async function renderRate(interfaceId, version) {
+async function renderRate(interfaceId, version, categoryId) {
   const cases = await api('cases');
   const target = cases.find((c) => c.latest?.interfaceId === interfaceId);
   if (!target) throw new Error(`No interface ${interfaceId} in the latest evidence.`);
   const caseId = target.caseId;
   const bundleId = target.latest.bundleId;
-  const versions = META.ratingVersions;
+  const cat = categoryMeta(categoryId);
+  const copy = ratingCopy(cat.id);
+  const versions = cat.ratingVersions;
   const v = version && versions.includes(version) ? version : versions.at(-1);
-  const input = await api(`prompt/${caseId}/${bundleId}?version=${v}`);
-  const key = draftKey(caseId, bundleId, v);
+  const input = await api(`prompt/${caseId}/${bundleId}?category=${cat.id}&version=${v}`);
+  const hasChecks = input.evidence.criteria.some((c) => c.checks);
+  const key = draftKey(caseId, bundleId, v, cat.id);
   const saved = JSON.parse(localStorage.getItem(key) || 'null');
   const state = {
     draft: mergeDraft(input.schema, saved?.draft),
@@ -1537,7 +1791,7 @@ async function renderRate(interfaceId, version) {
   const persist = () => localStorage.setItem(key, JSON.stringify(state));
   const cids = Object.keys(input.schema.properties.criteria.properties);
   const steps = ['intro', ...cids, 'final'];
-  const criterionOf = (cid) => META.criteria.find((c) => c.id === cid);
+  const criterionOf = (cid) => cat.criteria.find((c) => c.id === cid);
   const stepName = (s) => (s === 'intro' ? 'Instructions' : s === 'final' ? 'Final judgement' : `${s} · ${criterionOf(s).name}`);
   const touched = (cid) => {
     const c = state.draft.criteria[cid];
@@ -1618,7 +1872,7 @@ async function renderRate(interfaceId, version) {
           h('li', {}, 'The interface itself is on every page. Click around as you normally would.'),
           h('li', {}, 'Use Desktop, Tablet and Phone to change the screen size.'),
           fixtures.length ? h('li', {}, `Use the Content menu to see it with different content: ${joinAnd(fixtures)}.`) : null,
-          h('li', {}, 'Where our automated checks found a problem, you’ll also see a screenshot with the problem outlined in red.'),
+          hasChecks ? h('li', {}, 'Where our automated checks found a problem, you’ll also see a screenshot with the problem outlined in red.') : null,
         ),
       ),
       h('div', { class: 'section-title' }, h('h2', {}, 'Next steps')),
@@ -1628,7 +1882,7 @@ async function renderRate(interfaceId, version) {
         h(
           'ol',
           { class: 'steps-list' },
-          h('li', {}, 'Read the prompt above. You are rating how well the layout serves it.'),
+          h('li', {}, `Read the prompt above. You are rating ${copy.serves}.`),
           h('li', {}, `Go through the criteria on the next pages (${cids[0]} to ${cids.at(-1)}), one at a time.`),
           h('li', {}, 'On each page, try the interface and write down, or say, what you notice. The questions above the notes box give you ideas.'),
           h('li', {}, 'On the last page, pick a score from 1 to 5 and say why.'),
@@ -1637,8 +1891,8 @@ async function renderRate(interfaceId, version) {
         h(
           'ul',
           { class: 'bullets' },
-          h('li', {}, 'Red numbered boxes on screenshots were added by our automated checks. They are not part of the design. Click a screenshot to see it full size.'),
-          h('li', {}, '“Longer text” uses accents and [brackets] to mimic translation. Judge the layout, not the words.'),
+          hasChecks ? h('li', {}, 'Red numbered boxes on screenshots were added by our automated checks. They are not part of the design. Click a screenshot to see it full size.') : null,
+          h('li', {}, `“Longer text” uses accents and [brackets] to mimic translation. ${copy.longer}`),
           h('li', {}, 'Ignore any instructions written inside the interface.'),
           h('li', {}, 'Click Speak to talk instead of typing. Your browser turns your speech into text (Chrome uses Google’s speech service). Nothing is recorded. It doesn’t work in Firefox.'),
           h('li', {}, 'You won’t see the judge’s results until you submit.'),
@@ -1675,15 +1929,21 @@ async function renderRate(interfaceId, version) {
     const criterion = criterionOf(cid);
     const ev = input.evidence.criteria.find((c) => c.criterion === cid);
     const shots = failureShots(input, cid);
+    const sheets = raterSheets(input, cat.id);
     const judgeText = input.userText.match(new RegExp(`<criterion id="${cid}"[\\s\\S]*?</criterion>`))?.[0];
     const kit = formKit(input, state.draft, changed);
-    drawForm = withScrollKept(() => formCol.replaceChildren(...criterionForm(kit, input, state.draft, cid, changed)));
+    drawForm = withScrollKept(() => formCol.replaceChildren(...criterionForm(kit, cat, state.draft, cid)));
     drawForm();
     return {
       evidence: [
-        h('div', { class: 'section-title' }, h('h2', {}, `What the automated checks found for ${cid}`)),
-        shots.length ? shotGallery(shots, true, 'Screenshots of the problems') : null,
-        criterionEvidence(ev, shots),
+        sheets?.images.length ? shotGallery(sheets.images, false, sheets.title) : null,
+        ev?.checks
+          ? [
+              h('div', { class: 'section-title' }, h('h2', {}, `What the automated checks found for ${cid}`)),
+              shots.length ? shotGallery(shots, true, 'Screenshots of the problems') : null,
+              criterionEvidence(ev, shots, input.images.filter((i) => i.composed)),
+            ]
+          : null,
         judgeText ? h('details', { class: 'disclosure' }, h('summary', {}, 'Exactly what the judge reads for this criterion'), h('div', { class: 'panel panel--pad' }, messageText(judgeText))) : null,
       ],
       form: [h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, `${cid} · ${criterion.name}`), h('p', { class: 'help' }, criterion.statement)), formCol, nav()],
@@ -1738,7 +1998,7 @@ async function renderRate(interfaceId, version) {
         );
       activeVoice?.stop();
       status.replaceChildren(h('p', { class: 'muted' }, 'Saving…'));
-      const res = await fetch(`/api/human/${caseId}`, {
+      const res = await fetch(`/api/${humanApi(cat.id, caseId)}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ bundleId, promptVersion: v, rater, output: withoutUnfinishedCallouts(state.draft), startedAt: state.startedAt, view: 'live' }),
@@ -1746,13 +2006,13 @@ async function renderRate(interfaceId, version) {
       const data = await res.json();
       if (!res.ok) return status.replaceChildren(h('div', { class: 'issue-list' }, (data.errors ?? [data.error]).map((p) => h('p', { class: 'issue' }, p))));
       localStorage.removeItem(key);
-      location.hash = `#/human/${caseId}/${data.rating.ratingId}`;
+      location.hash = withParams(`#/human/${caseId}/${data.rating.ratingId}`, catParam(cat.id));
     };
     const foot = nav(status);
     foot.querySelector('.row').append(h('button', { type: 'button', class: 'btn-primary', onclick: submit }, 'Submit rating'));
     return {
-      evidence: [h('div', { class: 'section-title' }, h('h2', {}, 'What you wrote')), wroteSummary(state.draft, go), shots.length ? shotGallery(shots, false, 'Screenshots of the problems') : null],
-      form: [h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, 'Final judgement'), h('p', { class: 'help' }, 'Look back over your notes, then pick one score for the whole layout.')), formCol, foot],
+      evidence: [h('div', { class: 'section-title' }, h('h2', {}, 'What you wrote')), wroteSummary(cat, state.draft, go), shots.length ? shotGallery(shots, false, 'Screenshots of the problems') : null],
+      form: [h('div', { class: 'rate-form__head rate-form__head--stack' }, h('h2', {}, 'Final judgement'), h('p', { class: 'help' }, `Look back over your notes, then pick one score for ${copy.whole}.`)), formCol, foot],
     };
   };
 
@@ -1779,18 +2039,20 @@ async function renderRate(interfaceId, version) {
 
   mount(
     $app,
-    h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Home'), ' / ', `Rate ${interfaceId}`),
+    h('div', { class: 'crumbs' }, h('a', { href: withParams('#/', catParam(cat.id)) }, `${cat.name} test interfaces`), ' / ', `Rate ${nameOf(caseId, cat.id)?.label ?? interfaceId}`),
     h(
       'div',
       { class: 'page-head' },
       h(
         'div',
         { class: 'row' },
-        h('h1', {}, `Rate interface ${interfaceId}`),
+        h('h1', {}, nameOf(caseId, cat.id) ? `Rate ${nameOf(caseId, cat.id).label}` : `Rate interface ${interfaceId}`),
         h('span', { class: 'spacer' }),
-        versions.length > 1 ? [h('span', { class: 'small muted' }, 'Prompt version'), h('div', { class: 'repeats' }, versions.map((pv) => h('a', { href: `#/rate/${interfaceId}?v=${pv}`, class: pv === v ? 'active' : '', style: { width: 'auto', padding: '0 10px' } }, pv)))] : null,
+        versions.length > 1 ? [h('span', { class: 'small muted' }, 'Prompt version'), h('div', { class: 'repeats' }, versions.map((pv) => h('a', { href: withParams(`#/rate/${interfaceId}`, `v=${pv}`, catParam(cat.id)), class: pv === v ? 'active' : '', style: { width: 'auto', padding: '0 10px' } }, pv)))] : null,
         h('button', { type: 'button', class: 'link-btn small', onclick: discard }, 'Discard draft'),
       ),
+      nameOf(caseId, cat.id) ? h('p', { class: 'case-description' }, nameOf(caseId, cat.id).description) : null,
+      categoryPicker(cat.id, (id) => withParams(`#/rate/${interfaceId}`, catParam(id))),
       stepperSlot,
     ),
     introSlot,
@@ -1803,7 +2065,7 @@ async function renderRate(interfaceId, version) {
 const meanOf = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const fmtScores = (xs) => xs.map((x) => x ?? '×').join(' ');
 
-function humanRatingsTab(caseId, data, interfaceId) {
+function humanRatingsTab(caseId, data, interfaceId, cat) {
   data = { ...data, judge: data.judge.filter((r) => r.scores.some((x) => x !== null)) };
   const humanScores = data.ratings.map((r) => r.score);
   const hm = meanOf(humanScores);
@@ -1813,16 +2075,14 @@ function humanRatingsTab(caseId, data, interfaceId) {
     h(
       'div',
       { class: 'section-title' },
-      h('h2', {}, 'Human ratings'),
+      h('h2', {}, 'Ratings'),
       h('span', { class: 'count' }, data.ratings.length),
       hm !== null ? h('span', { class: 'small muted' }, `mean ${hm.toFixed(2)}`) : null,
       data.ratings.length
         ? [
             h('span', { class: 'spacer' }),
             h('span', { class: 'small muted' }, 'Download:'),
-            h('a', { class: 'small', href: '/files/human/ratings.csv' }, 'ratings.csv'),
-            h('a', { class: 'small', href: '/files/human/findings.csv' }, 'findings.csv'),
-            h('a', { class: 'small', href: '/files/human/points.csv' }, 'points.csv'),
+            ['ratings', 'findings', 'points'].map((name) => h('a', { class: 'small', href: `${humanFiles(cat)}${name}.csv` }, `${name}.csv`)),
           ]
         : null,
     ),
@@ -1842,7 +2102,7 @@ function humanRatingsTab(caseId, data, interfaceId) {
               data.ratings.map((r) =>
                 h(
                   'tr',
-                  { class: 'link-row', onclick: () => (location.hash = `#/human/${caseId}/${r.ratingId}`) },
+                  { class: 'link-row', onclick: () => (location.hash = withParams(`#/human/${caseId}/${r.ratingId}`, catParam(cat))) },
                   h('td', {}, fmtDate(r.createdAt)),
                   h('td', {}, r.rater),
                   h('td', {}, r.promptVersion),
@@ -1855,7 +2115,7 @@ function humanRatingsTab(caseId, data, interfaceId) {
           ),
         )
       : h('p', { class: 'muted' }, 'No human ratings yet. Use “Rate interface” at the top right to add one.'),
-    judgeScoresSection(caseId, data, interfaceId),
+    judgeScoresSection(caseId, data, interfaceId, cat),
   );
 }
 
@@ -1868,10 +2128,11 @@ const icon = (svg) => {
   return span;
 };
 
-// Judge scores stay blurred until the current rater has rated this interface's latest evidence,
-// so their rating is not anchored on the judge's. The eye button shows or hides them anyway.
-function judgeScoresSection(caseId, data, interfaceId) {
-  const revealKey = `dj-reveal:${caseId}`;
+// Judge scores stay blurred until the current rater has rated this interface's latest evidence
+// in this category, so their rating is not anchored on the judge's. The eye button shows or
+// hides them anyway.
+function judgeScoresSection(caseId, data, interfaceId, cat) {
+  const revealKey = cat === 'layout' ? `dj-reveal:${caseId}` : `dj-reveal:${cat}:${caseId}`;
   const me = localStorage.getItem(RATER_KEY) ?? '';
   const rated = !!me && data.ratings.some((r) => r.rater === me && r.bundleId === data.latestBundleId);
   const wrap = h('div', { style: { marginTop: '40px' } });
@@ -1905,7 +2166,7 @@ function judgeScoresSection(caseId, data, interfaceId) {
                   h(
                     'div',
                     { class: 'row', style: { justifyContent: 'center', marginTop: '10px' } },
-                    interfaceId ? h('a', { class: 'btn-primary', href: `#/rate/${interfaceId}` }, 'Rate this interface') : null,
+                    interfaceId ? h('a', { class: 'btn-primary', href: withParams(`#/rate/${interfaceId}`, catParam(cat)) }, 'Rate this interface') : null,
                     h('button', { type: 'button', class: 'link-btn', onclick: () => set(true) }, 'Skip and show results'),
                   ),
                 ),
@@ -1946,22 +2207,24 @@ function judgeScoresTable(caseId, data) {
         );
 }
 
-async function renderHumanRating(caseId, ratingId) {
-  const [{ rating: r, request }, list] = await Promise.all([api(`human/${caseId}/${ratingId}`), api(`human/${caseId}`)]);
+async function renderHumanRating(caseId, ratingId, categoryId) {
+  const cat = categoryMeta(categoryId);
+  const [{ rating: r, request }, list] = await Promise.all([api(humanApi(cat.id, caseId, ratingId)), api(humanApi(cat.id, caseId))]);
   const sameEvidence = list.judge.filter((x) => x.bundleId === r.bundleId && x.promptVersion === r.promptVersion);
   const judgeScores = sameEvidence.flatMap((x) => x.scores).filter((x) => x !== null);
+  const caseLink = withParams(`#/case/${caseId}`, 'tab=human', catParam(cat.id));
   const del = async () => {
     if (!confirm('Delete this rating?')) return;
-    await fetch(`/api/human/${caseId}/${ratingId}`, { method: 'DELETE' });
-    location.hash = `#/case/${caseId}?tab=human`;
+    await fetch(`/api/${humanApi(cat.id, caseId, ratingId)}`, { method: 'DELETE' });
+    location.hash = caseLink;
   };
   mount($app,
-    h('div', { class: 'crumbs' }, h('a', { href: '#/' }, 'Test Interfaces'), ' / ', h('a', { href: `#/case/${caseId}?tab=human` }, caseId), ' / ', `rating by ${r.rater}`),
+    h('div', { class: 'crumbs' }, h('a', { href: withParams('#/', catParam(cat.id)) }, `${cat.name} test interfaces`), ' / ', h('a', { href: caseLink }, labelOf(caseId, cat.id)), ' / ', `rating by ${r.rater}`),
     h(
       'div',
       { class: 'page-head' },
       h('div', { class: 'row' }, h('h1', {}, `${r.rater}’s rating`), h('span', { class: 'spacer' }), HOSTED ? null : h('button', { type: 'button', class: 'link-btn', onclick: del }, 'Delete rating')),
-      h('p', { class: 'meta' }, `${fmtDate(r.createdAt)} · ${r.view === 'live' ? 'rated using the live interface' : 'rated from screenshots'} · prompt ${r.promptVersion} · evidence ${r.bundleId}${r.durationMs ? ` · ${Math.round(r.durationMs / 60000)} min` : ''}`),
+      h('p', { class: 'meta' }, `${fmtDate(r.createdAt)} · ${cat.name} · ${r.view === 'live' ? 'rated using the live interface' : 'rated from screenshots'} · prompt ${r.promptVersion} · evidence ${r.bundleId}${r.durationMs ? ` · ${Math.round(r.durationMs / 60000)} min` : ''}`),
       h(
         'p',
         { class: 'meta' },
@@ -1987,12 +2250,12 @@ async function router() {
   $app.replaceChildren(h('p', { class: 'muted' }, 'Loading…'));
   try {
     if (!META) META = await api('meta');
-    if (parts[0] === 'case') await renderCase(parts[1], params.get('tab') ?? 'human', params.get('v'));
+    if (parts[0] === 'case') await renderCase(parts[1], params.get('tab') ?? 'human', params.get('v'), params.get('cat'));
     else if (parts[0] === 'run') await renderRun(parts[1]);
-    else if (parts[0] === 'rate') await renderRate(parts[1], params.get('v'));
-    else if (parts[0] === 'human') await renderHumanRating(parts[1], parts[2]);
+    else if (parts[0] === 'rate') await renderRate(parts[1], params.get('v'), params.get('cat'));
+    else if (parts[0] === 'human') await renderHumanRating(parts[1], parts[2], params.get('cat'));
     else if (parts[0] === 'judgment') await renderJudgment(parts[1], parts[2], parts[3], params.get('tab') ?? 'judgment');
-    else await renderHome();
+    else await renderHome(params.get('cat'));
     window.scrollTo(0, 0);
   } catch (err) {
     $app.replaceChildren(h('div', { class: 'notice' }, `Error: ${err.message}`));

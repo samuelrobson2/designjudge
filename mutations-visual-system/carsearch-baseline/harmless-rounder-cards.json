@@ -1,0 +1,11 @@
+{
+  "css": ".car { border-radius: 14px !important; } .car-img { border-radius: 14px 14px 0 0 !important; }",
+  "js": null,
+  "case": "carsearch-baseline",
+  "id": "harmless-rounder-cards",
+  "kind": "harmless",
+  "title": "Car cards get larger rounded corners",
+  "symptom": "Every car card and its image get 14 px corners instead of 10 px, consistently.",
+  "where": {},
+  "severity": "none"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "harmless-balanced-headings",
+  "case": "booking-baseline",
+  "kind": "harmless",
+  "title": "Headings use balanced wrapping",
+  "symptom": "Headings get text-wrap: balance, which only changes where long headings break.",
+  "where": {},
+  "severity": "none",
+  "css": "h1, h2, h3 { text-wrap: balance; }",
+  "js": null
+}

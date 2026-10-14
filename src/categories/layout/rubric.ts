@@ -1,6 +1,6 @@
-import fs from 'node:fs';
 import { LAYOUT_RUBRIC_PATH } from '../../config.ts';
 import { DIAG_NAMES } from '../../diagnostics/run.ts';
+import { readRubric } from '../versions.ts';
 
 export interface DiagnosticDef {
   diagId: string;
@@ -20,9 +20,15 @@ export interface CriterionSection {
   screenshotsLine: string;
   diagnosticLine: string;
   diagIds: string[];
+  // The criterion's "Reference:" and "Use this criterion for:" guidance, where the rubric gives it.
+  reference?: string;
+  useFor?: string;
 }
 
 export interface ParsedRubric {
+  // The category's name as the rubric's headings use it ("Layout", "Typography").
+  title?: string;
+  heading?: string;
   raw: string;
   measures: string;
   states: string;
@@ -39,12 +45,12 @@ const NAME_TO_ID: Record<string, string> = Object.fromEntries(Object.entries(DIA
 // Phrases the rubric uses in "Relevant Evidence" instead of a diagnostic's name.
 const ALIASES: Record<string, string> = { 'cross-viewport changes in element geometry': 'responsive_adaptation' };
 
-function between(text: string, start: string, end?: string): string {
+function between(file: string, text: string, start: string, end?: string): string {
   const i = text.indexOf(start);
-  if (i < 0) throw new Error(`layout_rubric.md: section "${start}" not found`);
+  if (i < 0) throw new Error(`${file}: section "${start}" not found`);
   const from = i + start.length;
   const j = end ? text.indexOf(end, from) : text.length;
-  if (j < 0) throw new Error(`layout_rubric.md: section end "${end}" not found after "${start}"`);
+  if (j < 0) throw new Error(`${file}: section end "${end}" not found after "${start}"`);
   return text.slice(from, j).trim();
 }
 
@@ -60,12 +66,12 @@ function clean(s: string): string {
   return s.replace(/^[-\s]+/, '').replace(/\s+/g, ' ').trim();
 }
 
-function parseDiagnostic(cells: string[], kind: DiagnosticDef['kind']): DiagnosticDef {
+function parseDiagnostic(file: string, cells: string[], kind: DiagnosticDef['kind']): DiagnosticDef {
   const nameMatch = cells[0].match(/\*\*(.+?)\*\*/);
-  if (!nameMatch) throw new Error(`layout_rubric.md: cannot read diagnostic name from "${cells[0]}"`);
+  if (!nameMatch) throw new Error(`${file}: cannot read diagnostic name from "${cells[0]}"`);
   const name = nameMatch[1].trim();
   const diagId = NAME_TO_ID[name.toLowerCase()];
-  if (!diagId) throw new Error(`layout_rubric.md: diagnostic "${name}" has no implementation`);
+  if (!diagId) throw new Error(`${file}: diagnostic "${name}" has no implementation`);
   const rest = cells[0].slice(nameMatch.index! + nameMatch[0].length).replace(/[*()]/g, '').trim();
   const out = cells[2];
   const pass = out.match(/\*\*Pass(?::\*\*|\*\*:)\s*(.*?)(?=\*\*On failure|\s+Report:|$)/);
@@ -90,15 +96,27 @@ function diagIdsIn(line: string): string[] {
   return hits.sort((a, b) => a.at - b.at).map((h) => h.id);
 }
 
-export function parseLayoutRubric(raw = fs.readFileSync(LAYOUT_RUBRIC_PATH, 'utf8')): ParsedRubric {
+export function parseLayoutRubric(raw = readRubric(LAYOUT_RUBRIC_PATH)): ParsedRubric {
+  return parseRubric(raw, 'Layout', 'layout_rubric.md');
+}
+
+// Any category's rubric written in layout_rubric.md's format; `title` is the name its headings use.
+// Categories without automated checks leave out the Diagnostic Evidence section.
+export function parseRubric(raw: string, title: string, file: string): ParsedRubric {
+  const scoringHeading = `### Overall ${title} Scoring:`;
   const measuresMatch = raw.match(/\*\*What this measures:\*\*.*$/m);
-  const deterministic = tableRows(between(raw, '**Deterministic Findings:**', '**Quantitative Observations:**')).map((c) => parseDiagnostic(c, 'deterministic'));
-  const observations = tableRows(between(raw, '**Quantitative Observations:**', '### Criteria based Evaluation:')).map((c) => parseDiagnostic(c, 'observation'));
-  const criteriaText = between(raw, '### Criteria based Evaluation:', '### Overall Layout Scoring:');
+  const hasDiagnostics = raw.includes('### Diagnostic Evidence:');
+  const deterministic = hasDiagnostics
+    ? tableRows(between(file, raw, '**Deterministic Findings:**', '**Quantitative Observations:**')).map((c) => parseDiagnostic(file, c, 'deterministic'))
+    : [];
+  const observations = hasDiagnostics
+    ? tableRows(between(file, raw, '**Quantitative Observations:**', '### Criteria based Evaluation:')).map((c) => parseDiagnostic(file, c, 'observation'))
+    : [];
+  const criteriaText = between(file, raw, '### Criteria based Evaluation:', scoringHeading);
 
   const headerRe = /\+\+\*\*([A-Z])\/ (.+?)\*\*\+\+/g;
   const headers = [...criteriaText.matchAll(headerRe)];
-  if (!headers.length) throw new Error('layout_rubric.md: no criteria headers (++**A/ Name**++) found');
+  if (!headers.length) throw new Error(`${file}: no criteria headers (++**A/ Name**++) found`);
   const criteria = headers.map((m, i) => {
     const text = criteriaText.slice(m.index!, i + 1 < headers.length ? headers[i + 1].index : undefined).trim();
     const screenshotsLine = text.match(/\*\*Screenshots:\*\*\s*(.+)/)?.[1].trim() ?? '';
@@ -107,23 +125,36 @@ export function parseLayoutRubric(raw = fs.readFileSync(LAYOUT_RUBRIC_PATH, 'utf
     const lower = text.toLowerCase();
     const pointsBlock = text.slice(lower.indexOf('evaluate'), lower.indexOf('relevant evidence') >= 0 ? lower.indexOf('relevant evidence') : undefined);
     const points = [...pointsBlock.matchAll(/^- \*\*(.+?):\*\*\s*(.+)$/gm)].map((p) => ({ name: p[1].trim(), definition: p[2].trim() }));
-    if (!statement || !points.length) throw new Error(`layout_rubric.md: criterion ${m[1]} is missing its statement or evaluation points`);
-    return { id: m[1], name: m[2].trim(), text, statement, points, screenshotsLine, diagnosticLine, diagIds: diagIdsIn(diagnosticLine) };
+    if (!statement || !points.length) throw new Error(`${file}: criterion ${m[1]} is missing its statement or evaluation points`);
+    const reference = text.match(/\*\*Reference:\*\*\s*(.+)/)?.[1].trim();
+    const useFor = text.match(/\*\*Use this criterion for:\*\*\s*(.+)/)?.[1].trim();
+    return {
+      id: m[1],
+      name: m[2].trim(),
+      text,
+      statement,
+      points,
+      screenshotsLine,
+      diagnosticLine,
+      diagIds: diagIdsIn(diagnosticLine),
+      ...(reference ? { reference } : {}),
+      ...(useFor ? { useFor } : {}),
+    };
   });
 
-  const states = between(raw, '### Evaluation States:', '### Diagnostic Evidence:');
+  const states = between(file, raw, '### Evaluation States:', hasDiagnostics ? '### Diagnostic Evidence:' : '### Criteria based Evaluation:');
   const stateDefinitions = Object.fromEntries(
     [...states.matchAll(/^- \*\*(.+?):\*\*\s*(.+)$/gm)].map((s) => [s[1].trim(), s[2].trim()]),
   );
 
-  const scoring = between(raw, '### Overall Layout Scoring:');
+  const scoring = between(file, raw, scoringHeading);
   const anchors = tableRows(scoring, 2)
     .map((cells) => {
       const m = cells[0].match(/\*\*(\d)\s*[:-]\s*([A-Za-z]+)/);
       return m ? { score: Number(m[1]), label: m[2], text: clean(cells[1]) } : null;
     })
     .filter((a): a is { score: number; label: string; text: string } => a !== null);
-  if (anchors.length !== 5) throw new Error(`layout_rubric.md: expected 5 scoring anchors, found ${anchors.length}`);
+  if (anchors.length !== 5) throw new Error(`${file}: expected 5 scoring anchors, found ${anchors.length}`);
   const scoringIntro = scoring
     .split('\n')
     .filter((l) => !l.trim().startsWith('|'))
@@ -131,6 +162,8 @@ export function parseLayoutRubric(raw = fs.readFileSync(LAYOUT_RUBRIC_PATH, 'utf
     .trim();
 
   return {
+    title,
+    heading: raw.match(/^## .+$/m)?.[0] ?? `## ${title}`,
     raw,
     measures: measuresMatch ? measuresMatch[0] : '',
     states,
@@ -171,7 +204,7 @@ export function judgeRubricText(p: ParsedRubric = parseLayoutRubric()): string {
   };
   return collapseTables(
     [
-      '## 1. Layout',
+      p.heading ?? '## 1. Layout',
       '',
       p.measures,
       '',
@@ -194,7 +227,7 @@ export function judgeRubricText(p: ParsedRubric = parseLayoutRubric()): string {
       p.criteriaPreamble,
       '',
       ...p.criteria.map((c) => c.text + '\n'),
-      '### Overall Layout Scoring:',
+      `### Overall ${p.title ?? 'Layout'} Scoring:`,
       '',
       p.scoring,
     ].join('\n'),

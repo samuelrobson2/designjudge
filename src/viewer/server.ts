@@ -3,20 +3,37 @@ import http from 'node:http';
 import path from 'node:path';
 import { EVIDENCE_DIR, ROOT, RUNS_DIR } from '../config.ts';
 import { caseDir, listCases, loadCase } from '../cases.ts';
-import { loadOrBuildPacket } from '../categories/index.ts';
-import { ensureMarkedScreenshots, markStateScreenshots } from '../categories/layout/marks.ts';
-import { buildLayoutRequest, listPromptVersions, promptConfig } from '../categories/layout/prompt.ts';
-import { loadExpectations, loadRun, summariseRun } from '../compare/compare.ts';
+import { buildRequest, CATEGORIES, categoryOf, ensurePacketImages, loadOrBuildPacket, parseCategoryRubric } from '../categories/index.ts';
+import { markStateScreenshots } from '../categories/layout/marks.ts';
+import { listPromptVersions, promptConfig } from '../categories/layout/prompt.ts';
+import { loadExpectations, loadRun, summariseRun, type CategoryExpectations } from '../compare/compare.ts';
 import { resolveInside, sendFile } from '../collect/server.ts';
+import { shownInteractiveStates } from '../collect/shown.ts';
 import { DIAG_NAMES } from '../diagnostics/run.ts';
 import { LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
-import { parseLayoutRubric } from '../categories/layout/rubric.ts';
+import { parseLayoutRubric, type ParsedRubric } from '../categories/layout/rubric.ts';
+import type { CriterionDef } from '../categories/types.ts';
 import { bundleDir, listBundles, listRuns, loadBundle, loadDiagnostics, runDir } from '../store.ts';
 import { deleteRating, HUMAN_DIR, listRatings, loadRating, saveRating } from '../human/store.ts';
 import { ratingListItem } from '../human/rating.ts';
+import type { RunRecord } from '../judge/record.ts';
 import { log, readJson } from '../util.ts';
+import { caseNames, CATEGORY_ORDER, gridLayout, inAnyGrid, orderedCategories } from './grid.ts';
+import { robustness } from './robustness.ts';
 
 const PUBLIC_DIR = path.join(ROOT, 'src/viewer/public');
+
+// Criteria with the rubric's statement and point definitions, for display.
+function criteriaWithText(criteria: CriterionDef[], rubric: ParsedRubric) {
+  return criteria.map((c) => {
+    const section = rubric.criteria.find((s) => s.id === c.id);
+    return {
+      ...c,
+      statement: section?.statement ?? '',
+      points: c.points.map((p) => ({ ...p, definition: section?.points.find((x) => x.name === p.name)?.definition ?? '' })),
+    };
+  });
+}
 
 function json(res: http.ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -51,7 +68,39 @@ function caseSummary(caseId: string) {
     bundles,
     latest,
     humanRatings: listRatings(caseId).map((r) => ({ rater: r.rater, bundleId: r.bundleId })),
+    inGrid: inAnyGrid(caseId),
   };
+}
+
+// The categories each interface belongs to: those whose expectations name it (in a pair or a
+// note) or with a judge run that included it. Runs saved before categories existed are Layout
+// runs. The home pages list the grid (grid.ts) instead.
+export function caseCategories(
+  expectations: Record<string, CategoryExpectations | null>,
+  runs: { category?: string; cases: { caseId: string }[] }[],
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const add = (caseId: string, category: string) => {
+    const list = out.get(caseId) ?? [];
+    if (!list.includes(category)) out.set(caseId, [...list, category]);
+  };
+  for (const [category, e] of Object.entries(expectations)) {
+    for (const p of e?.pairs ?? []) [p.baseline, p.variant].forEach((id) => add(id, category));
+    for (const id of Object.keys(e?.notes ?? {})) add(id, category);
+  }
+  for (const run of runs) for (const c of run.cases) add(c.caseId, run.category ?? 'layout');
+  return out;
+}
+
+function savedCaseCategories() {
+  const runs = listRuns().flatMap((id) => {
+    try {
+      return [readJson<RunRecord>(path.join(runDir(id), 'run.json'))];
+    } catch {
+      return [];
+    }
+  });
+  return caseCategories(Object.fromEntries(Object.keys(CATEGORIES).map((id) => [id, loadExpectations(id)])), runs);
 }
 
 function readBody(req: http.IncomingMessage): Promise<unknown> {
@@ -69,14 +118,15 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
   });
 }
 
-// Every judge score for one interface, per run, with the evidence bundle each run judged.
-function judgeScores(caseId: string) {
+// Every judge score for one interface in one category, per run, with the evidence bundle each
+// run judged.
+function judgeScores(caseId: string, category = 'layout') {
   return listRuns().flatMap((id) => {
     const reqFile = path.join(runDir(id), 'requests', `${caseId}.json`);
     if (!fs.existsSync(reqFile)) return [];
     try {
       const { run, judgments } = loadRun(id);
-      if (run.provider === 'mock') return [];
+      if (run.provider === 'mock' || (run.category ?? 'layout') !== category) return [];
       const js = judgments.filter((j) => j.caseId === caseId);
       return [
         {
@@ -119,23 +169,38 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     if (parts[0] === 'api') {
       const [, kind, a, b, c] = parts;
       if (kind === 'meta') {
-        const rubric = parseLayoutRubric();
+        const layout = criteriaWithText(LAYOUT_CRITERIA, parseLayoutRubric());
+        // Layout versions the step-by-step rating form supports (findings evidence).
+        const layoutRatingVersions = listPromptVersions().filter((v) => promptConfig(v).packet.evidence === 'findings');
         return json(res, {
           diagNames: DIAG_NAMES,
-          criteria: LAYOUT_CRITERIA.map((c) => {
-            const section = rubric.criteria.find((s) => s.id === c.id);
-            return {
-              ...c,
-              statement: section?.statement ?? '',
-              points: c.points.map((p) => ({ ...p, definition: section?.points.find((x) => x.name === p.name)?.definition ?? '' })),
-            };
-          }),
+          criteria: layout,
+          categories: Object.fromEntries(
+            orderedCategories(Object.values(CATEGORIES)).map((cat) => [
+              cat.id,
+              {
+                id: cat.id,
+                name: cat.name,
+                criteria: cat.id === 'layout' ? layout : criteriaWithText(cat.criteria, parseCategoryRubric(cat)),
+                promptVersions: listPromptVersions(cat.id),
+                ratingVersions: cat.id === 'layout' ? layoutRatingVersions : listPromptVersions(cat.id),
+              },
+            ]),
+          ),
           promptVersions: listPromptVersions(),
-          // Versions the step-by-step rating form supports (findings evidence).
-          ratingVersions: listPromptVersions().filter((v) => promptConfig(v).packet.evidence === 'findings'),
+          ratingVersions: layoutRatingVersions,
+          // Per category: its grid of test interfaces, and how every interface is named on its pages.
+          grid: Object.fromEntries(CATEGORY_ORDER.map((id) => [id, gridLayout(id)])),
+          names: caseNames(listCases()),
         });
       }
-      if (kind === 'cases') return json(res, listCases().map(caseSummary));
+      if (kind === 'robustness') {
+        return json(res, robustness(categoryOf(url.searchParams.get('category') ?? 'layout').id));
+      }
+      if (kind === 'cases') {
+        const categories = savedCaseCategories();
+        return json(res, listCases().map((id) => ({ ...caseSummary(id), categories: categories.get(id) ?? [] })));
+      }
       if (kind === 'checkmarks' && a) {
         const bundle = loadBundle(a, b);
         const diags = loadDiagnostics(bundle);
@@ -149,47 +214,58 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           codeFiles: listCodeFiles(a),
           bundle,
           diagnostics: loadDiagnostics(bundle),
+          // The interactive states every judge sees, with the control clicked to reach each one.
+          shownStates: shownInteractiveStates(bundle).map((s) => ({
+            id: s.id,
+            viewportId: s.viewportId,
+            selector: (s.steps?.[0]?.step as { selector?: string } | undefined)?.selector ?? null,
+          })),
         });
       }
       if (kind === 'prompt' && a) {
         const bundle = loadBundle(a, b);
-        const version = url.searchParams.get('version') ?? listPromptVersions().at(-1)!;
-        const packet = loadOrBuildPacket(bundle, version);
-        await ensureMarkedScreenshots(packet, bundleDir(a, bundle.bundleId));
-        const request = buildLayoutRequest(packet, bundleDir(a, bundle.bundleId), version);
+        const category = categoryOf(url.searchParams.get('category') ?? 'layout').id;
+        const version = url.searchParams.get('version') ?? listPromptVersions(category).at(-1)!;
+        const packet = loadOrBuildPacket(bundle, version, category);
+        await ensurePacketImages(packet, bundleDir(a, bundle.bundleId));
+        const request = buildRequest(packet, bundleDir(a, bundle.bundleId), version);
+        const composed = new Set(packet.images.filter((i) => i.composed).map((i) => i.id));
         return json(res, {
           ...request,
           bundleId: bundle.bundleId,
           request: packet.request,
           evidenceIndex: packet.index,
-          promptDescription: promptConfig(version).description,
-          images: request.images.map((i) => ({ ...i, path: path.relative(EVIDENCE_DIR, i.path) })),
+          promptDescription: promptConfig(version, category).description,
+          images: request.images.map((i) => ({ ...i, path: path.relative(EVIDENCE_DIR, i.path), ...(composed.has(i.id) ? { composed: true } : {}) })),
         });
       }
       if (kind === 'human' && a) {
-        if (req.method === 'POST' && !b) {
-          const result = await saveRating(a, (await readBody(req)) as Parameters<typeof saveRating>[1]);
+        // /api/human/<case>[/<ratingId>] for Layout, /api/human/<category>/<case>[/<ratingId>] otherwise.
+        const [category, caseId, ratingId] = a !== 'layout' && CATEGORIES[a] ? [a, b, c] : ['layout', a, b];
+        if (!caseId) return json(res, { error: 'Not found' }, 404);
+        if (req.method === 'POST' && !ratingId) {
+          const result = await saveRating(caseId, (await readBody(req)) as Parameters<typeof saveRating>[1], category);
           return json(res, result, result.errors ? 400 : 200);
         }
-        if (req.method === 'DELETE' && b) {
-          deleteRating(a, b);
+        if (req.method === 'DELETE' && ratingId) {
+          deleteRating(caseId, ratingId, category);
           return json(res, { ok: true });
         }
-        if (b) {
-          const rating = loadRating(a, b);
-          const bundle = loadBundle(a, rating.bundleId);
-          const packet = loadOrBuildPacket(bundle, rating.promptVersion);
-          await ensureMarkedScreenshots(packet, bundleDir(a, bundle.bundleId));
-          const request = buildLayoutRequest(packet, bundleDir(a, bundle.bundleId), rating.promptVersion);
+        if (ratingId) {
+          const rating = loadRating(caseId, ratingId, category);
+          const bundle = loadBundle(caseId, rating.bundleId);
+          const packet = loadOrBuildPacket(bundle, rating.promptVersion, category);
+          await ensurePacketImages(packet, bundleDir(caseId, bundle.bundleId));
+          const request = buildRequest(packet, bundleDir(caseId, bundle.bundleId), rating.promptVersion);
           return json(res, {
             rating,
             request: { ...request, evidenceIndex: packet.index, images: request.images.map((i) => ({ ...i, path: path.relative(EVIDENCE_DIR, i.path) })) },
           });
         }
         return json(res, {
-          latestBundleId: listBundles(a).length ? loadBundle(a).bundleId : null,
-          ratings: listRatings(a).map(ratingListItem),
-          judge: judgeScores(a),
+          latestBundleId: listBundles(caseId).length ? loadBundle(caseId).bundleId : null,
+          ratings: listRatings(caseId, category).map(ratingListItem),
+          judge: judgeScores(caseId, category),
         });
       }
       if (kind === 'runs') {
@@ -209,7 +285,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         return json(res, {
           run,
           report: summariseRun(a),
-          expectations: loadExpectations(),
+          expectations: loadExpectations(run.category ?? 'layout'),
           judgments: judgments.map((j) => ({
             caseId: j.caseId,
             repeat: j.repeat,

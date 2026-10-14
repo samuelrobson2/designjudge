@@ -1,0 +1,15 @@
+{
+  "css": "@keyframes dj-pulse { 50% { opacity: 0.55; } } .kpi__value { animation: dj-pulse 1.4s ease-in-out infinite; }",
+  "js": null,
+  "case": "dashboard-baseline",
+  "id": "kpi-values-pulse",
+  "kind": "defect",
+  "title": "KPI values pulse forever, even with reduced motion",
+  "symptom": "The four KPI values fade in and out continuously, and keep doing so when the user has asked the system for reduced motion.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "minor"
+}

@@ -1,0 +1,11 @@
+{
+  "css": ".field select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font: inherit; color: inherit; }",
+  "js": "const apply = () => { const phone = document.getElementById('field-phone');\nif (phone && !document.getElementById('field-pet-name')) {\n  phone.insertAdjacentHTML('afterend', '<div class=\"field\" id=\"field-pet-name\"><label for=\"pet-name\">Pet\\'s name</label><input id=\"pet-name\" name=\"pet-name\" /></div><div class=\"field\" id=\"field-species\"><label for=\"species\">Species</label><select id=\"species\" name=\"species\"><option>Dog</option><option>Cat</option><option>Rabbit</option><option>Other</option></select></div><div class=\"field\" id=\"field-breed\"><label for=\"breed\">Breed <span class=\"optional\">(optional)</span></label><input id=\"breed\" name=\"breed\" /></div>');\n}\ndocument.querySelectorAll(\"#notes-hint\").forEach((el) => { const to = {\"For example, the injury or pain you would like treated.\":\"For example, your pet's symptoms or vaccination history.\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "booking-clean",
+  "id": "pet-details-fields",
+  "kind": "defect",
+  "title": "Patient details ask about the patient's pet",
+  "symptom": "The \"Your details\" step asks for the pet's name, species (dog, cat, rabbit, other) and breed, and the notes hint asks about \"your pet's symptoms or vaccination history\": fields from a vet clinic's form on a physiotherapy booking page.",
+  "where": {},
+  "severity": "moderate"
+}

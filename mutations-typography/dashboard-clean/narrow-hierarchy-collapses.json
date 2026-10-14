@@ -1,0 +1,20 @@
+{
+  "id": "narrow-hierarchy-collapses",
+  "case": "dashboard-clean",
+  "kind": "defect",
+  "title": "Hierarchy collapses on tablets and phones",
+  "symptom": "Below 1024 px the page title, card headings, revenue figure and KPI values all drop to 14 px, the size of the body text, so on a tablet or phone the dashboard has no visible hierarchy; on desktop it is unchanged.",
+  "where": {
+    "viewports": [
+      "tablet",
+      "phone"
+    ],
+    "widths": [
+      320,
+      1023
+    ]
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 1023px) {\n  .page-head h1, .card h2, .hero h2, .hero__value, .kpi__value { font-size: 14px !important; letter-spacing: 0 !important; line-height: 1.5 !important; }\n  .hero__value, .kpi__value { font-weight: 600 !important; }\n}",
+  "js": null
+}

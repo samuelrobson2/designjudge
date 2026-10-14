@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll(\".hint, .field-hint\").forEach((el) => { const to = {\"Not sure which to choose? Book an initial assessment.\":\"If you're not sure which to choose, book an initial assessment.\",\"Choose Any available to see every open time.\":\"Pick Any available to see all open times.\",\"We will email your booking confirmation.\":\"We'll email you to confirm your booking.\",\"For example, the injury or pain you would like treated.\":\"For example, the injury or pain you'd like us to treat.\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "booking-clean",
+  "id": "harmless-reworded-hints",
+  "kind": "harmless",
+  "title": "Hints reworded",
+  "symptom": "The four hint lines say the same things in other words, for example \"If you're not sure which to choose, book an initial assessment.\"",
+  "where": {},
+  "severity": "none"
+}

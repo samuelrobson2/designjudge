@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview · Oak &amp; Ember</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .chart-card, .kpi__spark { display: none !important; }
+      .row-2 { grid-template-columns: minmax(0, 1fr) !important; }
+      .kpi { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'label' 'value' 'foot'; }
+      .setup { flex-basis: 100%; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+      .setup__card { padding: 20px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; gap: 12px; }
+      .setup__card h2 { font-size: 16px; font-weight: 600; }
+      .setup__bar { height: 6px; border-radius: 3px; background: #f1efeb; overflow: hidden; }
+      .setup__bar span { display: block; width: 33%; height: 100%; background: var(--accent); }
+      .setup__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+      .setup__list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .setup__list .done { color: var(--muted); text-decoration: line-through; }
+      .setup__card .btn { align-self: flex-start; }
+      .setup__list .btn { min-height: 32px; padding: 4px 12px; border: 1px solid var(--border); background: var(--surface); }
+      @media (max-width: 1023px) { .setup { grid-template-columns: minmax(0, 1fr); } }
+      @media (max-width: 639px) { .setup__list { grid-template-columns: minmax(0, 1fr); } }
+      .metric-input { width: 100%; max-width: 300px; padding: 2px 10px; font: inherit; color: inherit; letter-spacing: inherit; background: var(--surface); border: 1px solid #7b8390; border-radius: 8px; }
+      .manual-entry { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 14px 18px; background: #fff8e6; border: 1px solid #f0dca8; border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="shell"></div>
+    <script type="module" src="app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        {
+          const apply = () => {
+            const head = document.querySelector('.page-head');
+            if (head && !head.querySelector('.setup')) {
+              const step = (label, action) => '<li><span class="' + (action ? '' : 'done') + '">' + label + '</span>' + (action ? '<button type="button" class="btn">' + action + '</button>' : '') + '</li>';
+              head.insertAdjacentHTML('beforeend', '<section class="setup" aria-label="Set up your store">'
+                + '<div class="setup__card"><h2>Finish setting up Oak &amp; Ember</h2><p class="muted">2 of 6 steps complete</p><div class="setup__bar" aria-hidden="true"><span></span></div><ul class="setup__list">'
+                + step('Add your first product') + step('Set up payments') + step('Connect a custom domain', 'Connect') + step('Send your first email campaign', 'Create campaign') + step('Start a loyalty programme', 'Set up') + step('Install the Instagram shop app', 'Install')
+                + '</ul></div>'
+                + '<div class="setup__card"><h2>Try Oak &amp; Ember Pro free for 14 days</h2><p class="muted">AI product descriptions, abandoned-basket emails, gift cards and priority support.</p><button type="button" class="btn btn--primary">Start free trial</button></div>'
+                + '</section>');
+            }
+          };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+        {
+          const apply = () => {
+            document.querySelectorAll('.kpi__value').forEach((el) => {
+              if (el.querySelector('input')) return;
+              const label = el.parentElement.querySelector('.kpi__label')?.textContent ?? '';
+              const v = el.textContent.trim();
+              el.textContent = '';
+              const input = document.createElement('input');
+              input.className = 'metric-input';
+              input.value = v;
+              input.setAttribute('aria-label', label);
+              el.append(input);
+            });
+            const head = document.querySelector('.page-head');
+            if (head && !head.querySelector('.manual-entry')) head.insertAdjacentHTML('beforeend', '<div class="manual-entry"><p>Type this month\'s figures into the boxes, then save to update your dashboard.</p><button type="button" class="btn btn--primary">Save figures</button></div>');
+          };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+      }, { once: true });
+    </script>
+  </body>
+</html>

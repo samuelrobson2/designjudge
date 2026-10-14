@@ -1,0 +1,18 @@
+{
+  "id": "prices-and-ratings-cut-off",
+  "case": "carsearch-clean",
+  "kind": "defect",
+  "title": "Prices and price ratings cut off on every car",
+  "symptom": "Each price is clipped to a box four characters wide (\"£10,\", \"£14,\") and each price-rating line to 136 px, so the full price and the amount above or below average cannot be read on any listing.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": ".car__price { width: 4ch; overflow: hidden; white-space: nowrap; }\n.car__rating { flex-wrap: nowrap; width: 136px; overflow: hidden; white-space: nowrap; }",
+  "js": null
+}

@@ -1,19 +1,22 @@
 import type { Bundle, DiagnosticItem, DiagnosticResult, Diagnostics, ElementRef, StateRecord } from '../../types.ts';
-import { DIAG_NAMES } from '../../diagnostics/run.ts';
+import { shownInteractiveStates } from '../../collect/shown.ts';
+import { DIAG_NAMES, FUNCTIONALITY_DIAGNOSTICS, LAYOUT_ADDED_DIAGNOSTICS, TYPOGRAPHY_DIAGNOSTICS, VISUAL_SYSTEM_DIAGNOSTICS } from '../../diagnostics/run.ts';
+import { LAYOUT_RUBRIC_PATH } from '../../config.ts';
 import type { EvidenceIndexEntry, Packet, PacketImage } from '../types.ts';
+import { readRubric } from '../versions.ts';
 import { buildFindingsEvidence, stateName, type FindingLine, type FindingsCriterion } from './findings.ts';
 import { assignMarks, boxOnImage, lineVisibleIn } from './marks.ts';
 import { DIAGNOSTIC_HOME } from './homes.ts';
 import { parseLayoutRubric, screenshotMatcher } from './rubric.ts';
 
-export const LAYOUT_PACKET_VERSION = 'layout-packet-v1';
-export const LAYOUT_PACKET_VERSION_BY_CRITERION = 'layout-packet-v2';
-export const LAYOUT_PACKET_VERSION_FOCUSED = 'layout-packet-v3';
-export const LAYOUT_PACKET_VERSION_FINDINGS = 'layout-packet-v4-issue-shots';
+export const LAYOUT_PACKET_VERSION = 'layout-packet-v1.1';
+export const LAYOUT_PACKET_VERSION_BY_CRITERION = 'layout-packet-v2.1';
+export const LAYOUT_PACKET_VERSION_FOCUSED = 'layout-packet-v3.1';
+export const LAYOUT_PACKET_VERSION_FINDINGS = 'layout-packet-v5.1-one-click-states';
 
 export function packetVersionFor(opts: PacketOptions): string {
   if (opts.grouping === 'by-type') return LAYOUT_PACKET_VERSION;
-  if (opts.evidence === 'findings') return LAYOUT_PACKET_VERSION_FINDINGS;
+  if (opts.evidence === 'findings') return LAYOUT_PACKET_VERSION_FINDINGS + (opts.addedChecks ? '+added-checks' : '');
   return opts.evidence === 'focused' || opts.screenshots === 'essential' ? LAYOUT_PACKET_VERSION_FOCUSED : LAYOUT_PACKET_VERSION_BY_CRITERION;
 }
 
@@ -29,6 +32,8 @@ export interface PacketOptions {
   // sweep failures included) and observation measurements outside or close to their reference,
   // in plain words; states described by what they are. Needs grouping 'by-criterion'.
   evidence?: 'full' | 'focused' | 'findings';
+  // Findings: also the checks and measurements Layout v7 added (categories/versions.ts).
+  addedChecks?: boolean;
 }
 
 const ESSENTIAL_SWEEP_SCREENSHOTS = 2;
@@ -116,7 +121,14 @@ function viewportText(state: StateRecord): string {
 
 const ANCHOR_ORDER = ['desktop', 'tablet', 'mobile', 'stress-desktop'];
 
-export function buildLayoutPacket(bundle: Bundle, diags: Diagnostics, opts: PacketOptions = { grouping: 'by-type' }): Packet {
+export function buildLayoutPacket(bundle: Bundle, allDiags: Diagnostics, opts: PacketOptions = { grouping: 'by-type' }): Packet {
+  const diags = {
+    ...allDiags,
+    results: allDiags.results.filter(
+      (r) => !TYPOGRAPHY_DIAGNOSTICS.has(r.diagId) && !VISUAL_SYSTEM_DIAGNOSTICS.has(r.diagId) && !FUNCTIONALITY_DIAGNOSTICS.has(r.diagId) && (opts.addedChecks || !LAYOUT_ADDED_DIAGNOSTICS.has(r.diagId)),
+    ),
+  };
+  const rubric = () => parseLayoutRubric(readRubric(LAYOUT_RUBRIC_PATH, !!opts.addedChecks));
   const index: Record<string, EvidenceIndexEntry> = {};
   const images: PacketImage[] = [];
   const notes: string[] = [];
@@ -139,7 +151,7 @@ export function buildLayoutPacket(bundle: Bundle, diags: Diagnostics, opts: Pack
     fixture: s.fixture ?? 'application default content',
     status: s.status === 'collected' ? 'collected' : 'error',
     ...(s.error ? { error: s.error } : {}),
-    ...(s.settle && !s.settle.settled ? { note: `Render did not settle within ${s.settle.elapsedMs} ms; captured anyway.` } : {}),
+    ...(s.settle && !s.settle.settled ? { note: 'The page was still changing when it was captured.' } : {}),
     ...(s.kind === 'interactive'
       ? {
           reached_by:
@@ -189,12 +201,16 @@ export function buildLayoutPacket(bundle: Bundle, diags: Diagnostics, opts: Pack
 
   const essential = opts.screenshots === 'essential';
   const findings = opts.evidence === 'findings';
+  // Findings packets show the interactive states every category's judge sees; older packets
+  // show those not marked supporting.
+  const shownIds = new Set(shownInteractiveStates(bundle).map((s) => s.id));
+  const notShown = (s: StateRecord) => (findings ? s.kind === 'interactive' && !shownIds.has(s.id) : !!s.supporting);
   const hiddenFixedNote = (n: number, findingsWording: boolean) =>
     findingsWording
       ? ` ${n} fixed-position element${n > 1 ? 's are' : ' is'} hidden here; the first-screen screenshot shows ${n > 1 ? 'them' : 'it'} in place.`
       : ` ${n} fixed-position element${n > 1 ? 's are' : ' is'} hidden in this capture; the first-screen screenshot shows ${n > 1 ? 'them' : 'it'} in place.`;
   for (const s of judgedStates) {
-    if (s.status !== 'collected' || s.supporting) continue;
+    if (s.status !== 'collected' || notShown(s)) continue;
     const full = s.screenshots.find((x) => x.kind === 'full');
     const vp = s.screenshots.find((x) => x.kind === 'viewport');
     if (!vp) continue;
@@ -270,7 +286,7 @@ export function buildLayoutPacket(bundle: Bundle, diags: Diagnostics, opts: Pack
 
   if (findings) {
     const withShots = new Set(bundle.states.filter((s) => s.status === 'collected' && s.screenshots.length).map((s) => s.id));
-    const found = buildFindingsEvidence(bundle, diags, parseLayoutRubric(), new Set(images.map((i) => i.stateId)), index, withShots);
+    const found = buildFindingsEvidence(bundle, diags, rubric(), new Set(images.map((i) => i.stateId)), index, withShots, !!opts.addedChecks);
     selectIssueScreenshots(found.criteria, images, bundle, addImage, index);
     assignMarks(found.criteria, images);
     for (const img of images) {
@@ -418,9 +434,8 @@ export function buildLayoutPacket(bundle: Bundle, diags: Diagnostics, opts: Pack
   // "Relevant Evidence" in the rubric. In full mode a result relevant to several criteria
   // appears under each with the same ID; in focused mode only under its home criterion.
   const byCriterion = () => {
-    const rubric = parseLayoutRubric();
     const all = [...deterministicResults, ...matrixResults, ...observationResults];
-    return rubric.criteria.map((c) => {
+    return rubric().criteria.map((c) => {
       const wantsShot = screenshotMatcher(c.screenshotsLine);
       const base = {
         criterion: c.id,
@@ -530,7 +545,14 @@ function selectIssueScreenshots(
 ): void {
   const byId = new Map(bundle.states.map((s) => [s.id, s]));
   const issues = criteria.flatMap((c) => c.checks.flatMap((b) => b.issues.map((l) => ({ l, diagId: l.ids[0].match(/^F-([a-z_]+)-/)?.[1] ?? '' }))));
-  const shown = (l: FindingLine) => images.some((img) => lineVisibleIn(l, img));
+  // A fixed layer is on every screen of its state, so it places an issue only when the issue has
+  // no other element in that state.
+  const shows = (l: FindingLine, img: PacketImage) => {
+    const here = (l.boxes ?? []).filter((b) => b.stateId === img.stateId);
+    const placed = here.some((b) => !b.fixed) ? here.filter((b) => !b.fixed) : here;
+    return placed.some((b) => !!boxOnImage(b.rect, img, b.fixed));
+  };
+  const shown = (l: FindingLine) => images.some((img) => shows(l, img));
   const kindsFor = (diagId: string): ('scrolled' | 'full' | 'viewport')[] => (diagId === 'occluded_content' ? ['scrolled', 'viewport', 'full'] : ['full', 'viewport']);
   let added = 0;
   for (const { l, diagId } of issues) {

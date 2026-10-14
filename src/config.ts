@@ -4,14 +4,22 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CASES_DIR = path.join(ROOT, 'cases');
 export const ARTIFACTS_DIR = path.join(ROOT, 'artifacts');
-export const EVIDENCE_DIR = path.join(ARTIFACTS_DIR, 'evidence');
+// DJ_EVIDENCE_DIR collects into (and reads from) another folder, so trial collections leave the
+// stored evidence untouched.
+export const EVIDENCE_DIR_OVERRIDDEN = !!process.env.DJ_EVIDENCE_DIR;
+export const EVIDENCE_DIR = process.env.DJ_EVIDENCE_DIR ? path.resolve(process.env.DJ_EVIDENCE_DIR) : path.join(ARTIFACTS_DIR, 'evidence');
 export const RUNS_DIR = path.join(ARTIFACTS_DIR, 'runs');
 export const BENCHMARK_DIR = path.join(ROOT, 'benchmark');
 export const LAYOUT_RUBRIC_PATH = path.join(ROOT, 'layout_rubric.md');
+export const TYPOGRAPHY_RUBRIC_PATH = path.join(ROOT, 'typography_rubric.md');
+export const TASK_FIT_RUBRIC_PATH = path.join(ROOT, 'task_fit_rubric.md');
+export const CONTENT_QUALITY_RUBRIC_PATH = path.join(ROOT, 'content_quality_rubric.md');
+export const VISUAL_SYSTEM_RUBRIC_PATH = path.join(ROOT, 'visual_system_rubric.md');
+export const FUNCTIONALITY_RUBRIC_PATH = path.join(ROOT, 'functionality_rubric.md');
 export const PRICING_PATH = path.join(ROOT, 'config', 'pricing.json');
 
 export const COLLECTOR_VERSION = 'collector-v2';
-export const DIAGNOSTICS_VERSION = 'diagnostics-v2';
+export const DIAGNOSTICS_VERSION = 'diagnostics-v6';
 
 export interface Insets {
   top: number;
@@ -89,18 +97,31 @@ export const SWEEP_WIDTHS: number[] = (() => {
 })();
 export const SWEEP_HEIGHT = 900;
 
-export const SETTLE = {
-  networkQuietMs: 500,
-  layoutQuietMs: 500,
-  maxMs: 15_000,
-  pollMs: 100,
-  // Used after resizes and interaction steps, where a full reload is not involved.
-  liteLayoutQuietMs: 300,
-  liteMaxMs: 4_000,
-  // Layout shifts are recorded for at least this long after navigation (the longest window
-  // browsers use to group shifts), so content that arrives after the page first goes quiet counts.
-  stabilityWindowMs: 5_000,
+// Every page's clock is paused (collect.ts preparePage): its timers, animation frames and Date move
+// only when a wait gives it page time, so what is captured does not depend on machine speed. Each
+// wait gives this much page time, then holds until the page is quiet (settle.ts).
+export const PAGE_TIME = {
+  // After a navigation: also the window in which layout shifts are recorded (the longest window
+  // browsers use to group shifts), so content that arrives late counts.
+  loadMs: 5_000,
+  // After a click, key press, fill or scroll-through: also the window in which the Functionality
+  // probe watches what an action did.
+  actionMs: 1_500,
+  // After focus, hover, a forced pseudo-class, a scroll to a capture position or a resize.
+  briefMs: 500,
 };
+
+export const QUIESCE = {
+  // Wall-clock cap on one wait, only to abort a page that never goes quiet.
+  capMs: 30_000,
+  // A request still open after this long (a stream or long poll) is not waited for.
+  longRequestMs: 10_000,
+  // Every Playwright action's own cap; actions are only tried on a quiet page.
+  actionTimeoutMs: 10_000,
+};
+
+// Recorded with the evidence; a bundle without `pageTime` was collected with real-time waits.
+export const SETTLE = { pageTime: PAGE_TIME, capMs: QUIESCE.capMs };
 
 // Fixed clock for deterministic rendering of dates.
 export const FIXED_TIME = '2026-09-14T09:30:00+01:00';

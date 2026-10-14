@@ -1,0 +1,11 @@
+{
+  "css": ".toggles { gap: 2px !important; } .toggle { height: 16px; min-height: 0 !important; padding: 0 5px !important; font-size: 10px !important; line-height: 14px; }",
+  "js": null,
+  "case": "carsearch-baseline",
+  "id": "toggle-buttons-tiny",
+  "kind": "defect",
+  "title": "Fuel and gearbox toggles packed into tiny buttons",
+  "symptom": "The fuel-type and gearbox toggle buttons shrink to 16 px tall with 2 px between them, too small and too close together to hit reliably with a pointer or a finger.",
+  "where": {},
+  "severity": "minor"
+}

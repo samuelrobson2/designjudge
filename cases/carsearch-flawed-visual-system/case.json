@@ -1,0 +1,20 @@
+{
+  "id": "carsearch-flawed-visual-system",
+  "title": "Used car search — flawed copy (Visual System)",
+  "summary": "A copy of the original with Visual System problems added on purpose. The judge is not told what changed; it should score this lower than the original.",
+  "request": "Build a page to browse used cars for sale near the user, filter them by price, make, mileage and fuel type, sort the results, and compare listings to find a good deal.",
+  "source": {
+    "type": "static",
+    "dir": "site"
+  },
+  "entry": "/index.html",
+  "fixtures": {
+    "supported": [
+      "empty",
+      "typical",
+      "dense",
+      "expanded",
+      "stress"
+    ]
+  }
+}

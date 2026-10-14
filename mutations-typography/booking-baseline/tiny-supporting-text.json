@@ -1,0 +1,11 @@
+{
+  "id": "tiny-supporting-text",
+  "case": "booking-baseline",
+  "kind": "defect",
+  "title": "Supporting text set at 10 px",
+  "symptom": "Treatment descriptions, card details, the summary note and error messages drop to 10 px, too small to read comfortably.",
+  "where": {},
+  "severity": "moderate",
+  "css": ".option-card__desc, .option-card__meta, .summary__note, .field-error { font-size: 10px !important; }",
+  "js": null
+}

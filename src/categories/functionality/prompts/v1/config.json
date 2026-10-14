@@ -1,0 +1,13 @@
+{
+  "description": "First Functionality prompt: Typography v1's structure (fixed system prompt, findings evidence under each criterion) with failed checks only, the states two clicks deep and the screen after each filled-in form submission.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

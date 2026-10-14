@@ -1,0 +1,11 @@
+{
+  "css": ".kpi:nth-child(2) { border-color: transparent; border-radius: 4px; box-shadow: 0 8px 20px rgba(16, 24, 40, 0.18); }",
+  "js": null,
+  "case": "dashboard-baseline",
+  "id": "odd-kpi-card",
+  "kind": "defect",
+  "title": "One KPI card styled differently from the others",
+  "symptom": "The second KPI card loses its border and gets a deep drop shadow and tighter corners, while the other three are flat bordered cards.",
+  "where": {},
+  "severity": "minor"
+}

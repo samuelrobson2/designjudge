@@ -1,10 +1,10 @@
 import path from 'node:path';
 import { EVIDENCE_DIR } from '../config.ts';
-import { loadOrBuildPacket } from '../categories/index.ts';
-import { ensureMarkedScreenshots } from '../categories/layout/marks.ts';
-import { buildLayoutRequest, type JudgeRequest } from '../categories/layout/prompt.ts';
+import { buildRequest, categoryOf, ensurePacketImages, loadOrBuildPacket } from '../categories/index.ts';
+import type { JudgeRequest } from '../categories/layout/prompt.ts';
 import type { Packet } from '../categories/types.ts';
 import { bundleDir, loadBundle, runDir } from '../store.ts';
+import type { Bundle } from '../types.ts';
 import { log, mapLimit, timestampId, writeJson } from '../util.ts';
 import { estimateCost } from './pricing.ts';
 import { mockProvider } from './providers/mock.ts';
@@ -16,6 +16,7 @@ import { parseOutput, validateJudgment } from './validate.ts';
 
 export interface JudgeOptions {
   caseIds: string[];
+  category?: string;
   provider: 'openai' | 'mock' | 'replay';
   model: string;
   repeats: number;
@@ -25,6 +26,11 @@ export interface JudgeOptions {
   replayRun?: string;
   mockMode?: 'ok' | 'invalid_json' | 'unknown_refs';
   label?: string;
+  // Planted-variant judging: evidence judged under a name other than its case folder, repeats for
+  // particular cases, and a run folder outside artifacts/runs (which the viewer and rating site list).
+  bundles?: Record<string, Bundle>;
+  repeatsFor?: Record<string, number>;
+  runsDir?: string;
 }
 
 function providerFor(opts: JudgeOptions): Provider {
@@ -42,18 +48,20 @@ export async function runJudge(opts: JudgeOptions): Promise<string> {
   if (opts.provider === 'openai' && !process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set. Add OPENAI_API_KEY=... to .env in the project root, or use --provider mock.');
   }
-  const runId = `${timestampId()}-${opts.provider}-${model}-${opts.promptVersion}`.replace(/[^A-Za-z0-9._-]/g, '_');
-  const dir = runDir(runId);
+  const category = categoryOf(opts.category ?? 'layout').id;
+  const runId = `${timestampId()}-${opts.provider}-${model}-${category === 'layout' ? '' : `${category}-`}${opts.promptVersion}`.replace(/[^A-Za-z0-9._-]/g, '_');
+  const dir = opts.runsDir ? path.join(opts.runsDir, runId) : runDir(runId);
 
   const prepared: { caseId: string; packet: Packet; req: JudgeRequest; bundleId: string; interfaceId: string }[] = [];
   for (const caseId of opts.caseIds) {
-    const bundle = loadBundle(caseId);
-    const packet = loadOrBuildPacket(bundle, opts.promptVersion);
-    await ensureMarkedScreenshots(packet, bundleDir(caseId, bundle.bundleId));
-    const req = buildLayoutRequest(packet, bundleDir(caseId, bundle.bundleId), opts.promptVersion);
+    const bundle = opts.bundles?.[caseId] ?? loadBundle(caseId);
+    const packet = loadOrBuildPacket(bundle, opts.promptVersion, category);
+    await ensurePacketImages(packet, bundleDir(bundle.caseId, bundle.bundleId));
+    const req = buildRequest(packet, bundleDir(bundle.caseId, bundle.bundleId), opts.promptVersion);
     prepared.push({ caseId, packet, req, bundleId: bundle.bundleId, interfaceId: bundle.interfaceId });
     // Exactly what the judge receives (images referenced by path and hash).
     writeJson(path.join(dir, 'requests', `${caseId}.json`), {
+      category,
       caseId,
       bundleId: bundle.bundleId,
       packetVersion: packet.packetVersion,
@@ -76,7 +84,7 @@ export async function runJudge(opts: JudgeOptions): Promise<string> {
     schemaVersion: 1,
     runId,
     createdAt: new Date().toISOString(),
-    category: 'layout',
+    category,
     provider: opts.provider,
     model,
     effort: opts.effort,
@@ -97,9 +105,9 @@ export async function runJudge(opts: JudgeOptions): Promise<string> {
   };
   writeJson(path.join(dir, 'run.json'), run);
 
-  const jobs = prepared.flatMap((p) => Array.from({ length: opts.repeats }, (_, i) => ({ ...p, repeat: i + 1 })));
+  const jobs = prepared.flatMap((p) => Array.from({ length: opts.repeatsFor?.[p.caseId] ?? opts.repeats }, (_, i) => ({ ...p, repeat: i + 1 })));
   const approxTokens = prepared.reduce((s, p) => s + p.req.images.reduce((a, i) => a + i.estimatedTokens, 0) + (p.req.instructions.length + p.req.userText.length) / 4, 0);
-  log(`[judge] run ${runId}: ${jobs.length} calls (${prepared.length} cases × ${opts.repeats}), ~${Math.round(approxTokens / Math.max(1, prepared.length) / 1000)}k input tokens per call, provider ${provider.name}, model ${model}`);
+  log(`[judge] run ${runId}: ${jobs.length} calls (${prepared.length} cases${opts.repeatsFor ? '' : ` × ${opts.repeats}`}), ~${Math.round(approxTokens / Math.max(1, prepared.length) / 1000)}k input tokens per call, provider ${provider.name}, model ${model}`);
 
   const records = await mapLimit(jobs, opts.concurrency, async (job) => {
     const startedAt = new Date().toISOString();
@@ -124,7 +132,7 @@ export async function runJudge(opts: JudgeOptions): Promise<string> {
     const rec: JudgmentRecord = {
       schemaVersion: 1,
       runId,
-      category: 'layout',
+      category,
       caseId: job.caseId,
       bundleId: job.bundleId,
       interfaceId: job.interfaceId,

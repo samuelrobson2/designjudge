@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll('.segmented__btn[role=\"radio\"]').forEach((b, i) => { const want = i === 0 ? 'true' : 'false'; if (b.getAttribute('aria-checked') !== want) b.setAttribute('aria-checked', want); }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "dashboard-baseline",
+  "id": "range-state-not-exposed",
+  "kind": "defect",
+  "title": "Date range selection not exposed",
+  "symptom": "Choosing another date range highlights it, but its radio state stays on \"7 days\", so assistive technology and anything reading the control state report the wrong range.",
+  "where": {},
+  "severity": "minor"
+}

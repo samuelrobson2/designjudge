@@ -6,7 +6,9 @@
 
 import type { Page } from 'playwright';
 import { lite, measureChange, type LiteSnapshot } from './discover.ts';
-import { waitForSettled } from './settle.ts';
+import { QUIESCE } from '../config.ts';
+import { quiesce } from './settle.ts';
+import { clickOrDispatch } from './steps.ts';
 
 type FillKind = 'fill' | 'choose' | 'select' | 'check';
 
@@ -146,20 +148,16 @@ const isOn = (selector: string) => `(() => {
 async function apply(page: Page, t: FillTarget, blur = true): Promise<'done' | 'skipped'> {
   const loc = page.locator(t.selector).first();
   if (t.kind === 'fill') {
-    await loc.fill(fillValue(t), { timeout: 2000 });
-    if (blur) await loc.blur({ timeout: 1000 }).catch(() => {});
+    await loc.fill(fillValue(t), { timeout: QUIESCE.actionTimeoutMs });
+    if (blur) await loc.blur({ timeout: QUIESCE.actionTimeoutMs }).catch(() => {});
     return 'done';
   }
   if (t.kind === 'select') {
-    await loc.selectOption(t.value!, { timeout: 2000 });
+    await loc.selectOption(t.value!, { timeout: QUIESCE.actionTimeoutMs });
     return 'done';
   }
   if (await page.evaluate(isOn(t.selector))) return 'skipped';
-  try {
-    await loc.click({ timeout: 2000 });
-  } catch {
-    await loc.dispatchEvent('click', undefined, { timeout: 1000 });
-  }
+  await clickOrDispatch(page, loc, t.selector);
   return 'done';
 }
 
@@ -204,7 +202,7 @@ export async function fillForStress(page: Page, reload: () => Promise<void>): Pr
       actions.push({ ...base, outcome: 'failed', reason: (err as Error).message.split('\n')[0].slice(0, 160) });
       continue;
     }
-    await waitForSettled(page, null, true);
+    await quiesce(page, 'action');
     const reason = undoReason(before, await lite(page));
     if (!reason) {
       kept.push(t);
@@ -215,10 +213,10 @@ export async function fillForStress(page: Page, reload: () => Promise<void>): Pr
     actions.push({ ...base, outcome: 'undone', reason });
     await reload();
     for (const k of kept) await apply(page, k).catch(() => 'skipped');
-    await waitForSettled(page, null, true);
+    await quiesce(page, 'action');
   }
   await page.evaluate('document.activeElement && document.activeElement.blur && document.activeElement.blur()');
-  await waitForSettled(page, null, true);
+  await quiesce(page, 'action');
   // Pages that re-render on change without keeping input values empty a field when it loses
   // focus; such a field is typed into again and left focused, as it would be mid-typing.
   for (const k of kept.filter((k) => k.kind === 'fill')) {

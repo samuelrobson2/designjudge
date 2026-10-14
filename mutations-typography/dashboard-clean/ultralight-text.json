@@ -1,0 +1,17 @@
+{
+  "id": "ultralight-text",
+  "case": "dashboard-clean",
+  "kind": "defect",
+  "title": "All small text in light and extra-light weights",
+  "symptom": "Everything below the headline figures is set light: table text, headings, KPI labels, product names, statuses and the date range at weight 300, and captions, chart labels, product sales counts and subtitles at weight 200, so the 12–14 px text that carries the detail looks faint.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "moderate",
+  "css": ":root { font-weight: 300; }\n.card h2, .hero h2, .kpi__label, .product__name, .product__rev, .orders__table th, .orders__table td.col-total, .order-link, .segmented__btn, .status, .delta, .brand__name, .lines__total, .page-head h1 { font-weight: 300 !important; }\n.product__meta, .chart__tick, .chart__x, .legend, .card__sub, .page-head__sub, .order-row__meta, .muted { font-weight: 200 !important; }",
+  "js": null
+}

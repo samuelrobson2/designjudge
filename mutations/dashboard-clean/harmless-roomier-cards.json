@@ -1,0 +1,20 @@
+{
+  "id": "harmless-roomier-cards",
+  "case": "dashboard-clean",
+  "kind": "harmless",
+  "title": "More space between and inside the cards on wide screens",
+  "symptom": "From 1024 px the gap between cards grows from 28 px to 36 px and the card padding from 24 px to 28 px.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ],
+    "widths": [
+      1024,
+      1920
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": "@media (min-width: 1024px) {\n  :root { --gap: 36px; --pad: 28px; }\n}",
+  "js": null
+}

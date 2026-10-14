@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll('.error-summary a[href^=\"#\"]').forEach((a) => { if (!a.getAttribute('href').startsWith('#step-')) a.setAttribute('href', '#step-' + a.getAttribute('href').slice(1)); }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "booking-baseline",
+  "id": "error-links-broken",
+  "kind": "defect",
+  "title": "Error summary links point nowhere",
+  "symptom": "After a failed submission, the links in the error summary (\"Choose a treatment\", \"Enter your full name\", …) point at IDs that do not exist on the page, so clicking them does not take the user to the problem.",
+  "where": {
+    "interaction": "Press \"Confirm booking\" with the form empty, then click a link in the error summary"
+  },
+  "severity": "minor"
+}

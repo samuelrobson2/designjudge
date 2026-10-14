@@ -1,16 +1,18 @@
 // Captures a raw layout snapshot of the current page. Bundled to an IIFE by esbuild and exposed
 // as window.__djSnapshot(cap). All diagnostics are computed later from this data in Node.
 
-import type { ElementRecord, OcclusionProbe, OcclusionRecord, Rect, Snapshot } from '../../types.ts';
+import type { ElementRecord, OcclusionProbe, OcclusionRecord, PictureRecord, Rect, Snapshot, TypeRecord } from '../../types.ts';
 
 declare global {
   interface Window {
     __djId: (el: Element) => number;
     __djSnapshot: (cap: number) => Snapshot;
+    __djBackgroundSizes: () => Promise<number>;
     __djSignature: () => string;
     __djScrollThrough: () => Promise<number>;
     __djOcclusion: (insets: { top: number; right: number; bottom: number; left: number } | null) => OcclusionProbe;
     __djDescribe: (el: Element) => Record<string, unknown>;
+    __djFontSamples: (cap: number) => { stack: string; weight: number; style: string; sample: string }[];
   }
 }
 
@@ -200,10 +202,282 @@ function isVisuallyHidden(el: Element, cs: CSSStyleDeclaration, r: DOMRect): boo
   return false;
 }
 
+// ---------- Typography ----------
+
+const VALUE_INPUTS = new Set(['', 'text', 'search', 'email', 'tel', 'url', 'number', 'password', 'date', 'datetime-local', 'month', 'time', 'week', 'submit', 'button', 'reset']);
+const MAX_LINES = 12;
+
+function cssPx(value: string): number {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? round(n) : NaN;
+}
+
+// Rendered width of each line: rects whose vertical centre falls within an earlier rect's span
+// share its line.
+function lineWidths(rects: DOMRect[]): number[] {
+  const lines: { top: number; bottom: number; left: number; right: number }[] = [];
+  const sorted = [...rects].filter((r) => r.width > 0 && r.height > 0).sort((a, b) => a.top - b.top || a.left - b.left);
+  for (const r of sorted) {
+    const mid = (r.top + r.bottom) / 2;
+    const line = lines.find((l) => mid >= l.top && mid <= l.bottom);
+    if (line) {
+      line.left = Math.min(line.left, r.left);
+      line.right = Math.max(line.right, r.right);
+    } else lines.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
+  }
+  return lines.map((l) => round(l.right - l.left));
+}
+
+function isInlineLevel(el: Element): boolean {
+  const d = getComputedStyle(el).display;
+  return d.startsWith('inline') || d === 'contents' || d === 'none';
+}
+
+function contentWidth(el: Element): number {
+  let block: Element | null = el;
+  while (block && block !== document.body && isInlineLevel(block)) block = block.parentElement;
+  if (!block) return 0;
+  const cs = getComputedStyle(block);
+  return round(block.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0));
+}
+
+function headingLevel(el: Element): number | null {
+  const h = el.closest('h1, h2, h3, h4, h5, h6, [role="heading"]');
+  if (!h) return null;
+  const m = h.tagName.match(/^H([1-6])$/);
+  if (m && !h.getAttribute('role')) return Number(m[1]);
+  const level = Number(h.getAttribute('aria-level'));
+  return Number.isInteger(level) && level > 0 ? level : m ? Number(m[1]) : 2;
+}
+
+function typeOf(el: Element, cs: CSSStyleDeclaration, textNodes: Node[], text: string): TypeRecord | null {
+  let field: TypeRecord['field'];
+  let chars = text.replace(/\s+/g, ' ').trim().length;
+  let rects: DOMRect[] = [];
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    const input = el as HTMLInputElement;
+    if (tag === 'INPUT' && !VALUE_INPUTS.has((input.getAttribute('type') ?? '').toLowerCase())) return null;
+    const value = tag === 'SELECT' ? ((el as HTMLSelectElement).selectedOptions[0]?.text ?? '') : input.value;
+    const placeholder = input.placeholder ?? '';
+    field = value.trim() ? 'value' : placeholder.trim() ? 'placeholder' : 'empty';
+    chars = (value.trim() || placeholder.trim()).length;
+  } else {
+    if (!textNodes.length) return null;
+    const range = document.createRange();
+    // The whole run of text when every child is inline (a paragraph with a link inside); else only
+    // the element's own text nodes.
+    if ([...el.children].every(isInlineLevel)) {
+      range.selectNodeContents(el);
+      rects = [...range.getClientRects()];
+    } else {
+      for (const node of textNodes) {
+        range.selectNodeContents(node);
+        rects.push(...range.getClientRects());
+      }
+    }
+  }
+  const lines = lineWidths(rects);
+  const lh = cs.lineHeight === 'normal' ? null : cssPx(cs.lineHeight);
+  return {
+    size: cssPx(cs.fontSize),
+    weight: Number(cs.fontWeight) || 400,
+    family: cs.fontFamily,
+    style: cs.fontStyle,
+    lineHeight: lh,
+    letterSpacing: cs.letterSpacing === 'normal' ? 0 : cssPx(cs.letterSpacing),
+    transform: cs.textTransform,
+    wrap: cs.getPropertyValue('text-wrap-style') || cs.getPropertyValue('text-wrap') || 'wrap',
+    align: cs.textAlign,
+    color: cs.color,
+    chars,
+    lines: lines.slice(0, MAX_LINES),
+    lineCount: field ? 1 : lines.length,
+    avail: contentWidth(el),
+    heading: headingLevel(el),
+    ...(field ? { field } : {}),
+  };
+}
+
+// One sample element per computed font-family, weight and style with visible text (the one with
+// the most text), kept on window for the collector to ask Chromium which fonts rendered it.
+function fontSamples(cap: number): { stack: string; weight: number; style: string; sample: string }[] {
+  const best = new Map<string, { el: Element; chars: number }>();
+  for (const el of document.body ? document.body.getElementsByTagName('*') : []) {
+    if (SKIP_TAGS.has(el.tagName)) continue;
+    let chars = 0;
+    for (const n of el.childNodes) if (n.nodeType === 3) chars += (n.textContent ?? '').trim().length;
+    if (!chars || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true } as any)) continue;
+    const cs = getComputedStyle(el);
+    const key = `${cs.fontFamily}|${Number(cs.fontWeight) || 400}|${cs.fontStyle}`;
+    const cur = best.get(key);
+    if (!cur || chars > cur.chars) best.set(key, { el, chars });
+  }
+  const picked = [...best.entries()].sort((a, b) => b[1].chars - a[1].chars).slice(0, cap);
+  (window as any).__djFontSampleEls = picked.map(([, v]) => v.el);
+  return picked.map(([key, v]) => {
+    const [stack, weight, style] = key.split('|');
+    return { stack, weight: Number(weight), style, sample: selectorFor(v.el) };
+  });
+}
+
+// ---------- Pictures ----------
+
+// SVG files keep their own preserveAspectRatio inside the box, so object-fit and background-size
+// do not describe how they are drawn.
+const VECTOR_SRC = /^data:image\/svg|\.svg(?:[?#]|$)/i;
+const CONTROL_SELECTOR = 'button, a[href], label, summary, select, input, textarea, [role=button], [role=link], [role=tab], [role=menuitem]';
+// SVGPreserveAspectRatio alignments 2–10 (xMinYMin … xMaxYMax); 1 is none.
+const SVG_ALIGN = ['0%', '50%', '100%'];
+const bgSizes = new Map<string, [number, number]>();
+
+// One entry per background layer, split at top-level commas.
+function layers(value: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of value) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) {
+      out.push(cur.trim());
+      cur = '';
+    } else cur += ch;
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function firstBackgroundUrl(cs: CSSStyleDeclaration): { url: string; layer: number } | null {
+  const list = layers(cs.backgroundImage);
+  const layer = list.findIndex((l) => l.startsWith('url('));
+  const url = layer >= 0 ? list[layer].match(/^url\(["']?(.*?)["']?\)$/)?.[1] : undefined;
+  return url ? { url, layer } : null;
+}
+
+// Loads each background image once more (from the cache) to read its natural size.
+async function backgroundSizes(): Promise<number> {
+  const urls = new Set<string>();
+  for (const el of document.body ? document.body.getElementsByTagName('*') : []) {
+    const bg = firstBackgroundUrl(getComputedStyle(el));
+    if (bg && !VECTOR_SRC.test(bg.url) && !bgSizes.has(bg.url)) urls.add(bg.url);
+  }
+  await Promise.all(
+    [...urls].slice(0, 200).map(async (url) => {
+      const im = new Image();
+      im.src = url;
+      await Promise.race([im.decode().catch(() => {}), realDelay(2000)]);
+      if (im.naturalWidth && im.naturalHeight) bgSizes.set(url, [im.naturalWidth, im.naturalHeight]);
+    }),
+  );
+  return bgSizes.size;
+}
+
+function pictureBox(cs: CSSStyleDeclaration, r: DOMRect, origin: string): [number, number] {
+  const n = (v: string) => parseFloat(v) || 0;
+  let w = r.width;
+  let h = r.height;
+  if (origin !== 'border-box') {
+    w -= n(cs.borderLeftWidth) + n(cs.borderRightWidth);
+    h -= n(cs.borderTopWidth) + n(cs.borderBottomWidth);
+  }
+  if (origin === 'content-box') {
+    w -= n(cs.paddingLeft) + n(cs.paddingRight);
+    h -= n(cs.paddingTop) + n(cs.paddingBottom);
+  }
+  return [round(w), round(h)];
+}
+
+function hasTextOutsideControls(el: Element): boolean {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!n.textContent?.trim()) continue;
+    const control = n.parentElement?.closest(CONTROL_SELECTOR);
+    if (!control || control === el || !el.contains(control)) return true;
+  }
+  return false;
+}
+
+function isDecorativePicture(el: Element, source: PictureRecord['source']): boolean {
+  const role = el.getAttribute('role');
+  if (el.closest('[aria-hidden="true"]') || role === 'presentation' || role === 'none') return true;
+  const labelled = role === 'img' || el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby');
+  if (source === 'img') return el.getAttribute('alt') === '' && !labelled;
+  if (source === 'svg') return !labelled && !el.querySelector(':scope > title');
+  if (source === 'background') return !labelled && hasTextOutsideControls(el);
+  return false;
+}
+
+function pictureOf(el: Element, id: number, cs: CSSStyleDeclaration, r: DOMRect): PictureRecord | null {
+  const tag = el.tagName.toUpperCase();
+  const pair = (v: string): [string, string] => {
+    const t = v.trim().split(/\s+/);
+    return t.length === 2 ? [t[0], t[1]] : ['50%', '50%'];
+  };
+  const fitted = (source: PictureRecord['source'], natural: [number, number]): PictureRecord => ({
+    id,
+    source,
+    natural,
+    box: pictureBox(cs, r, 'content-box'),
+    fit: cs.objectFit,
+    position: pair(cs.objectPosition),
+    decorative: isDecorativePicture(el, source),
+  });
+  if (tag === 'IMG') {
+    const im = el as HTMLImageElement;
+    if (!im.complete || !im.naturalWidth || !im.naturalHeight || VECTOR_SRC.test(im.currentSrc)) return null;
+    return fitted('img', [im.naturalWidth, im.naturalHeight]);
+  }
+  if (tag === 'VIDEO') {
+    const v = el as HTMLVideoElement;
+    return v.videoWidth && v.videoHeight ? fitted('video', [v.videoWidth, v.videoHeight]) : null;
+  }
+  if (tag === 'CANVAS') {
+    const c = el as HTMLCanvasElement;
+    return c.width && c.height ? fitted('canvas', [c.width, c.height]) : null;
+  }
+  if (tag === 'SVG') {
+    const svg = el as SVGSVGElement;
+    const vb = svg.viewBox?.baseVal;
+    if (!vb || !vb.width || !vb.height) return null;
+    const par = svg.preserveAspectRatio.baseVal;
+    const align = par.align >= 2 ? par.align - 2 : 4;
+    return {
+      ...fitted('svg', [round(vb.width), round(vb.height)]),
+      fit: par.align === 1 ? 'fill' : par.meetOrSlice === 2 ? 'cover' : 'contain',
+      position: [SVG_ALIGN[align % 3], SVG_ALIGN[Math.floor(align / 3)]],
+    };
+  }
+  const bg = firstBackgroundUrl(cs);
+  if (!bg) return null;
+  const at = (v: string) => {
+    const l = layers(v);
+    return l[bg.layer % l.length] ?? '';
+  };
+  const natural = bgSizes.get(bg.url);
+  // A fixed background is positioned against the viewport, not its box.
+  if (!natural || at(cs.backgroundAttachment) === 'fixed') return null;
+  const rep = at(cs.backgroundRepeat).split(/\s+/);
+  const repeats = (t: string | undefined) => t !== undefined && t !== 'no-repeat';
+  const repeat: [boolean, boolean] =
+    rep[0] === 'repeat-x' ? [true, false] : rep[0] === 'repeat-y' ? [false, true] : [repeats(rep[0]), repeats(rep[1] ?? rep[0])];
+  return {
+    id,
+    source: 'background',
+    natural,
+    box: pictureBox(cs, r, at(cs.backgroundOrigin)),
+    fit: at(cs.backgroundSize),
+    position: [at(cs.backgroundPositionX), at(cs.backgroundPositionY)],
+    repeat,
+    decorative: isDecorativePicture(el, 'background'),
+  };
+}
+
 function snapshot(cap: number): Snapshot {
   const sx = window.scrollX;
   const sy = window.scrollY;
   const elements: ElementRecord[] = [];
+  const pictures: PictureRecord[] = [];
   let truncated = false;
   let order = 0;
 
@@ -228,10 +502,12 @@ function snapshot(cap: number): Snapshot {
     let ownText = false;
     let textRect: Rect | null = null;
     let text = '';
+    const textNodes: Node[] = [];
     for (const node of el.childNodes) {
       if (node.nodeType === 3 && node.textContent && node.textContent.trim()) {
         ownText = true;
         text += node.textContent;
+        textNodes.push(node);
         const range = document.createRange();
         range.selectNodeContents(node);
         const tr = range.getBoundingClientRect();
@@ -356,7 +632,11 @@ function snapshot(cap: number): Snapshot {
       labelFor,
       img,
     };
+    const type = typeOf(el, cs, textNodes, text);
+    if (type) rec.type = type;
     elements.push(rec);
+    const picture = pictureOf(el, id, cs, r);
+    if (picture) pictures.push(picture);
 
     // Do not descend into SVG internals or replaced content.
     if (tagUpper === 'SVG' || el.tagName === 'IFRAME' || el.tagName === 'SELECT') return;
@@ -396,6 +676,8 @@ function snapshot(cap: number): Snapshot {
     scroll: { x: sx, y: sy },
     elements,
     truncated,
+    pictures,
+    webFonts: [...new Set([...document.fonts].map((f) => f.family.replace(/^["']|["']$/g, '')))],
   };
 }
 
@@ -410,21 +692,33 @@ function signature(): string {
   return `${els.length}:${h}:${document.documentElement.scrollHeight}:${document.documentElement.scrollWidth}`;
 }
 
+// Real timers and frames: the page's own are paused with its clock (settle.ts).
+type RealTimers = { setTimeout: (fn: () => void, ms?: number) => number; requestAnimationFrame: (fn: () => void) => number };
+const realTimers = (): RealTimers => (window as unknown as { __pwClock?: { builtins: RealTimers } }).__pwClock?.builtins ?? (window as unknown as RealTimers);
+const realDelay = (ms: number) => new Promise<void>((r) => realTimers().setTimeout(() => r(), ms));
+const realFrames = (n: number) =>
+  new Promise<void>((resolve) => {
+    const step = () => (--n <= 0 ? resolve() : realTimers().requestAnimationFrame(step));
+    realTimers().requestAnimationFrame(step);
+  });
+
+// Scrolls through the page a screen at a time, rendering each position so lazy content starts to
+// load; the caller's wait (page time and quiet) lets it arrive.
 async function scrollThrough(): Promise<number> {
   const step = Math.max(200, Math.floor(window.innerHeight * 0.8));
   let y = 0;
   let guard = 0;
   while (y < document.documentElement.scrollHeight && guard++ < 60) {
-    window.scrollTo(0, y);
-    await new Promise((r) => setTimeout(r, 60));
+    window.scrollTo({ top: y, left: 0, behavior: 'instant' as ScrollBehavior });
+    await realFrames(2);
     y += step;
   }
   const images = [...document.images].filter((im) => !im.complete);
   await Promise.race([
     Promise.all(images.map((im) => new Promise((r) => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); }))),
-    new Promise((r) => setTimeout(r, 3000)),
+    realDelay(3000),
   ]);
-  window.scrollTo(0, 0);
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   return guard;
 }
 
@@ -724,6 +1018,8 @@ function occlusion(insets: { top: number; right: number; bottom: number; left: n
 }
 
 window.__djSnapshot = snapshot;
+window.__djBackgroundSizes = backgroundSizes;
+window.__djFontSamples = fontSamples;
 window.__djSignature = signature;
 window.__djScrollThrough = scrollThrough;
 window.__djOcclusion = occlusion;

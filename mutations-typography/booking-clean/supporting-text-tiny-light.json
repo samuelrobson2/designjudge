@@ -1,0 +1,17 @@
+{
+  "id": "supporting-text-tiny-light",
+  "case": "booking-clean",
+  "kind": "defect",
+  "title": "Hints, descriptions and summary labels tiny and light",
+  "symptom": "Step hints, treatment durations and descriptions, \"(optional)\" markers, the notes hint, the weekday names on the date chips and the summary labels are set at 11 px in weight 300, so the information that explains each choice is hard to read.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "severe",
+  "css": ".hint, .option__desc, .optional, .field-hint, .date-chip__day, .summary__row dt, .empty-state__body { font-size: 11px !important; font-weight: 300 !important; }",
+  "js": null
+}

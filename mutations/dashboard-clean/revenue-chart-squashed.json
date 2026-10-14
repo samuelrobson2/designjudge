@@ -1,0 +1,18 @@
+{
+  "id": "revenue-chart-squashed",
+  "case": "dashboard-clean",
+  "kind": "defect",
+  "title": "Revenue chart squashed into a thin strip",
+  "symptom": "The revenue chart is drawn 52 px tall at every width, leaving the rest of the revenue card empty: the trend is a near-flat line and the five axis labels are crammed into 36 px, on top of each other.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": ".chart__canvas { flex: none !important; min-height: 0 !important; height: 52px; }",
+  "js": null
+}

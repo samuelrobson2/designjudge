@@ -1,10 +1,12 @@
 // The one server-side piece of the hosted rating site: saves each rating as a new file in the
-// GitHub repo (benchmark/human/<case>/<ratingId>.json, the same layout as local ratings) and
-// lists them. Everything else on the site is static files written by `npm run publish`.
+// GitHub repo (benchmark/human/<case>/<ratingId>.json for Layout and
+// benchmark/human/<category>/<case>/<ratingId>.json for other categories, the same layout as
+// local ratings) and lists them. Everything else on the site is static files written by `npm run publish`.
 
 import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { humanCsvs, makeRating, ratingListItem, type HumanRating, type RatingInput } from '../human/rating.ts';
+import { CATEGORIES } from '../categories/index.ts';
+import { categoryDir, humanCsvs, makeRating, ratingListItem, type HumanRating, type RatingInput } from '../human/rating.ts';
 import type { HostedKit } from './kit.ts';
 
 const kit: HostedKit = JSON.parse(fs.readFileSync(new URL('./kit.json', import.meta.url), 'utf8'));
@@ -69,15 +71,18 @@ async function readBlob(sha: string): Promise<HumanRating> {
   return r;
 }
 
-async function ratingsFor(caseId?: string): Promise<HumanRating[]> {
-  const cases = caseId ? [caseId] : (await listDir(dir)).filter((f) => f.type === 'dir' && kit.cases[f.name]).map((f) => f.name);
-  const files = (await Promise.all(cases.map((c) => listDir(`${dir}/${c}`)))).flat().filter((f) => f.type === 'file' && f.name.endsWith('.json'));
+const ratingsDir = (category: string) => [dir, categoryDir(category)].filter(Boolean).join('/');
+
+async function ratingsFor(category: string, caseId?: string): Promise<HumanRating[]> {
+  const root = ratingsDir(category);
+  const cases = caseId ? [caseId] : (await listDir(root)).filter((f) => f.type === 'dir' && kit.cases[f.name]).map((f) => f.name);
+  const files = (await Promise.all(cases.map((c) => listDir(`${root}/${c}`)))).flat().filter((f) => f.type === 'file' && f.name.endsWith('.json'));
   return (await Promise.all(files.map((f) => readBlob(f.sha)))).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-async function ratingById(caseId: string, ratingId: string): Promise<HumanRating | null> {
+async function ratingById(category: string, caseId: string, ratingId: string): Promise<HumanRating | null> {
   try {
-    return JSON.parse(await gh(`contents/${dir}/${caseId}/${ratingId}.json?ref=${encodeURIComponent(branch)}`, { raw: true }));
+    return JSON.parse(await gh(`contents/${ratingsDir(category)}/${caseId}/${ratingId}.json?ref=${encodeURIComponent(branch)}`, { raw: true }));
   } catch (err) {
     if (err instanceof GitHubError && err.status === 404) return null;
     throw err;
@@ -86,16 +91,18 @@ async function ratingById(caseId: string, ratingId: string): Promise<HumanRating
 
 // Each rating is a new file, so saves never edit each other; GitHub answers 409 when two commits
 // race for the branch (retry) and 422 when the file already exists (pick another ID).
-async function commitRating(rating: HumanRating): Promise<HumanRating> {
+async function commitRating(category: string, rating: HumanRating): Promise<HumanRating> {
+  const root = ratingsDir(category);
+  const label = [categoryDir(category), rating.caseId].filter(Boolean).join('/');
   let r = rating;
   for (let attempt = 1; attempt <= 6; attempt++) {
     try {
-      await gh(`contents/${dir}/${r.caseId}/${r.ratingId}.json`, {
+      await gh(`contents/${root}/${r.caseId}/${r.ratingId}.json`, {
         method: 'PUT',
-        body: { message: `Add human rating ${r.caseId}/${r.ratingId}`, content: Buffer.from(JSON.stringify(r, null, 2)).toString('base64'), branch },
+        body: { message: `Add human rating ${label}/${r.ratingId}`, content: Buffer.from(JSON.stringify(r, null, 2)).toString('base64'), branch },
       });
-      listings.delete(`${dir}/${r.caseId}`);
-      listings.delete(dir);
+      listings.delete(`${root}/${r.caseId}`);
+      listings.delete(root);
       return r;
     } catch (err) {
       if (!(err instanceof GitHubError)) throw err;
@@ -134,23 +141,32 @@ function readBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
-// Routes reach this function as /api/human?path=<case>[/<ratingId>] or /api/human?csv=<name>;
-// the original pathname is also accepted.
-function route(req: IncomingMessage): { parts: string[]; csvName: string | null } {
+const isCategory = (s: string | undefined | null): s is string => !!s && s !== 'layout' && !!CATEGORIES[s];
+
+// Routes reach this function as /api/human?path=[<category>/]<case>[/<ratingId>] or
+// /api/human?csv=<name>[&category=<category>]; the original pathname is also accepted. Layout
+// has no category segment.
+function route(req: IncomingMessage): { category: string; parts: string[]; csvName: string | null } {
   const url = new URL(req.url ?? '/', 'http://localhost');
-  const csvName = url.searchParams.get('csv') ?? url.pathname.match(/^\/files\/human\/(ratings|findings|points)\.csv$/)?.[1] ?? null;
+  const csvPath = url.pathname.match(/^\/files\/human\/(?:([a-z_]+)\/)?(ratings|findings|points)\.csv$/);
+  const csvName = url.searchParams.get('csv') ?? csvPath?.[2] ?? null;
   const raw = url.searchParams.get('path') ?? url.pathname.replace(/^\/api\/human\/?/, '');
-  return { parts: raw.split('/').filter(Boolean).map(decodeURIComponent), csvName };
+  const parts = raw.split('/').filter(Boolean).map(decodeURIComponent);
+  if (csvName) {
+    const c = url.searchParams.get('category') ?? csvPath?.[1];
+    return { category: isCategory(c) ? c : 'layout', parts: [], csvName };
+  }
+  return isCategory(parts[0]) ? { category: parts[0], parts: parts.slice(1), csvName } : { category: 'layout', parts, csvName };
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
-    const { parts, csvName } = route(req);
+    const { category, parts, csvName } = route(req);
     const [caseId, ratingId] = parts;
 
     if (csvName) {
       const file = `${csvName}.csv` as keyof ReturnType<typeof humanCsvs>;
-      const text = humanCsvs(await ratingsFor())[file];
+      const text = humanCsvs(await ratingsFor(category), category)[file];
       if (text === undefined) return send(res, 404, { error: 'Not found' });
       res.setHeader('content-disposition', `attachment; filename="${file}"`);
       return send(res, 200, text, 'text/csv; charset=utf-8');
@@ -158,14 +174,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (req.method === 'DELETE') return send(res, 405, { error: 'Ratings cannot be deleted on the hosted site.' });
     if (!caseId) {
       if (req.method !== 'GET') return send(res, 405, { error: 'Method not allowed' });
-      return send(res, 200, await ratingsFor());
+      return send(res, 200, await ratingsFor(category));
     }
     const c = kit.cases[caseId];
     if (!ID.test(caseId) || !c) return send(res, 404, { error: `Unknown interface ${caseId}` });
 
     if (req.method === 'POST' && !ratingId) {
       const input = (await readBody(req)) as RatingInput | null;
-      const version = input && c.bundles[input.bundleId]?.versions[input.promptVersion];
+      const version = input && c.bundles[input.bundleId]?.categories[category]?.[input.promptVersion];
       if (!input || !version) return send(res, 400, { errors: ['The evidence for this interface has changed since you started. Reload the page and try again.'] });
       const result = makeRating(
         {
@@ -180,17 +196,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         input,
       );
       if (!result.rating) return send(res, 400, { errors: result.errors });
-      return send(res, 200, { rating: await commitRating(result.rating) });
+      return send(res, 200, { rating: await commitRating(category, result.rating) });
     }
     if (req.method !== 'GET') return send(res, 405, { error: 'Method not allowed' });
 
     if (ratingId) {
       if (!ID.test(ratingId)) return send(res, 400, { error: 'Invalid rating ID' });
-      const rating = await ratingById(caseId, ratingId);
+      const rating = await ratingById(category, caseId, ratingId);
       if (!rating) return send(res, 404, { error: 'Rating not found' });
-      return send(res, 200, { rating, request: c.bundles[rating.bundleId]?.versions[rating.promptVersion]?.request ?? null });
+      return send(res, 200, { rating, request: c.bundles[rating.bundleId]?.categories[category]?.[rating.promptVersion]?.request ?? null });
     }
-    return send(res, 200, { latestBundleId: c.latestBundleId, ratings: (await ratingsFor(caseId)).map(ratingListItem), judge: c.judge });
+    return send(res, 200, { latestBundleId: c.latestBundleId, ratings: (await ratingsFor(category, caseId)).map(ratingListItem), judge: c.judge[category] ?? [] });
   } catch (err) {
     console.error(err);
     return send(res, 500, { error: err instanceof GitHubError ? 'Could not reach the ratings store. Please try again.' : (err as Error).message });

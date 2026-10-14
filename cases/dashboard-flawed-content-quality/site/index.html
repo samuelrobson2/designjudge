@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overview · Oak &amp; Ember</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="shell"></div>
+    <script type="module" src="app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        {
+          const apply = () => { document.querySelectorAll("#h-revenue, .kpi__label, .legend__item--prev").forEach((el) => { const to = {"Revenue":"Revenue, last 7 days","Orders":"Orders this year","Avg. order value":"Avg. order value, all time","Conversion rate":"Conversion rate, today","Previous period":"Same days last year"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; }); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+        {
+          const apply = () => { document.querySelectorAll("#h-products, #h-orders, .chart-card .card__sub, .orders-table th, .status").forEach((el) => { const to = {"Top products":"SKU perf.","Recent orders":"Order log (n=8)","This month · compared with the previous period":"MTD vs PMTD","7 days · compared with the previous period":"L7D vs P7D","30 days · compared with the previous period":"L30D vs P30D","12 months · compared with the previous period":"LTM vs PLTM","Order":"Ord#","Customer":"Cust","Date":"Ts","Items":"Qty","Total":"Amt","Status":"Fulfil. stat","Paid":"PD/UNFUL","Fulfilled":"FUL","Pending":"AUTH/PND","Refunded":"RFND"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; });
+          document.querySelectorAll('.product__units').forEach((p) => { if (/ sold$/.test(p.textContent)) p.textContent = p.textContent.replace(/ sold$/, 'u'); }); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+      }, { once: true });
+    </script>
+  </body>
+</html>

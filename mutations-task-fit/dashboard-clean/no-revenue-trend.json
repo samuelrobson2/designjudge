@@ -1,0 +1,11 @@
+{
+  "css": ".hero .chart { display: none !important; } .hero { align-self: start !important; }",
+  "js": null,
+  "case": "dashboard-clean",
+  "id": "no-revenue-trend",
+  "kind": "defect",
+  "title": "No revenue trend",
+  "symptom": "The revenue card shows only the total and its change. The chart of revenue over time, which the request asks for, is gone.",
+  "where": {},
+  "severity": "severe"
+}

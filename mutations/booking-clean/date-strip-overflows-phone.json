@@ -1,0 +1,20 @@
+{
+  "id": "date-strip-overflows-phone",
+  "case": "booking-clean",
+  "kind": "defect",
+  "title": "Dates and times run off the side of phone screens",
+  "symptom": "Below 640 px the date strip keeps all six dates in one row of 92 px days and the time grid keeps five 92 px columns, so on a phone more than half of the dates and times lie beyond the right edge of the screen and the whole page scrolls sideways.",
+  "where": {
+    "viewports": [
+      "phone"
+    ],
+    "widths": [
+      320,
+      639
+    ],
+    "interaction": null
+  },
+  "severity": "severe",
+  "css": "@media (max-width: 639px) {\n  .date-strip { grid-template-columns: repeat(6, 92px) !important; }\n  .slot-grid { grid-template-columns: repeat(5, 92px) !important; }\n}",
+  "js": null
+}

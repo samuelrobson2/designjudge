@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const b = e.target.closest && e.target.closest('.save');\n  if (!b) return;\n  const on = b.getAttribute('aria-pressed') !== 'true';\n  b.setAttribute('aria-pressed', String(on));\n  b.textContent = on ? '♥' : '♡';\n}, true);",
+  "case": "carsearch-baseline",
+  "id": "harmless-save-works",
+  "kind": "harmless",
+  "title": "Save buttons toggle a saved state",
+  "symptom": "The heart buttons on the car cards now toggle: a click fills the heart and marks the button pressed.",
+  "where": {},
+  "severity": "none"
+}

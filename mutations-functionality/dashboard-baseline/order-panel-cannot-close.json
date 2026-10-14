@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-action=\\\"close-order\\\"]\");\n  if (!el) return;\n  e.stopPropagation();\n}, true);",
+  "case": "dashboard-baseline",
+  "id": "order-panel-cannot-close",
+  "kind": "defect",
+  "title": "Order panel cannot be closed",
+  "symptom": "Once an order is opened, neither its Close button nor the backdrop closes the panel, leaving the user stuck on that order.",
+  "where": {
+    "interaction": "Click an order in \"Recent orders\", then try to close the panel"
+  },
+  "severity": "severe"
+}

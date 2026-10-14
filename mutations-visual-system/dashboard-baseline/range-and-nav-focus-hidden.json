@@ -1,0 +1,15 @@
+{
+  "css": ".segmented__btn:focus, .nav__item:focus { outline: none !important; }",
+  "js": null,
+  "case": "dashboard-baseline",
+  "id": "range-and-nav-focus-hidden",
+  "kind": "defect",
+  "title": "No focus indication on the date range and navigation",
+  "symptom": "The date-range buttons and sidebar links have their focus outline removed with no replacement, so keyboard users cannot see where they are.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ]
+  },
+  "severity": "moderate"
+}

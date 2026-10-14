@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll(\".segmented__btn\").forEach((el) => { const to = {\"7 days\":\"Last 7 days\",\"30 days\":\"Last 30 days\",\"90 days\":\"Last 90 days\"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; }); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "dashboard-clean",
+  "id": "harmless-range-labels",
+  "kind": "harmless",
+  "title": "Date range buttons reworded",
+  "symptom": "The date range buttons read \"Last 7 days\", \"This month\", \"Last 30 days\" and \"Last 90 days\" instead of \"7 days\", \"This month\", \"30 days\" and \"90 days\".",
+  "where": {},
+  "severity": "none"
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Used cars near Bristol · Motorwise</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .car-img img.car-img__img { display: block; width: 100%; height: 100%; object-fit: contain; background: #eef1f4; color: #586174; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        {
+          const apply = () => { document.querySelectorAll('.car-img').forEach((m) => {
+            const svg = m.querySelector('svg.car-img__svg');
+            if (!svg) return;
+            const n = 2041 + Number(m.closest('.car')?.querySelector('[data-compare]')?.dataset.compare || 0);
+            svg.outerHTML = '<img class="car-img__img" src="photos/IMG_' + n + '.jpg" alt="IMG_' + n + '.jpg" />';
+          }); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+        {
+          const average = {"Volkswagen Golf":15600,"Toyota Corolla":18700,"Ford Puma":15400,"Kia Niro":23100,"BMW 3 Series":17300,"Audi A3":18200,"Volkswagen Polo":10900,"Toyota RAV4":25250,"Ford Focus":12100};
+          const apply = () => { document.querySelectorAll('.deal').forEach((d) => {
+            if (d.dataset.flipped || d.classList.contains('deal--fair')) return;
+            const card = d.closest('.car');
+            const title = (card?.querySelector('.car__title')?.textContent ?? '').trim().replace(/^\d{4} /, '');
+            const price = Number((card?.querySelector('.car__price')?.textContent ?? '').replace(/\D/g, ''));
+            if (!(title in average) || !price) return;
+            d.dataset.flipped = '1';
+            d.textContent = d.textContent + ' · £' + Math.abs(average[title] - price).toLocaleString('en-GB') + ' above average';
+          }); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+        {
+          const textNode = (el) => [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+          const apply = () => { const names = ['Compare', 'Shortlist', 'Add to comparison', 'Watch'];
+          document.querySelectorAll('label.compare').forEach((l, i) => { const node = textNode(l); const to = ' ' + names[i % names.length]; if (node && node.textContent !== to) node.textContent = to; });
+          const count = document.querySelector('.page__count');
+          const cn = count && textNode(count);
+          if (cn && /cars? for sale/.test(cn.textContent)) cn.textContent = cn.textContent.replace(/cars? for sale/, (m) => (m === 'car for sale' ? 'vehicle for sale' : 'vehicles for sale'));
+          document.querySelectorAll('.fgroup > legend').forEach((el) => { const to = {"Make":"Brand","Mileage":"Odometer"}[el.textContent.trim()]; if (to !== undefined && el.textContent !== to) el.textContent = to; });
+          document.querySelectorAll('.filters__foot .btn').forEach((b) => { if (/ cars?$/.test(b.textContent)) b.textContent = b.textContent.replace(/ cars?$/, (m) => (m === ' car' ? ' listing' : ' listings')); });
+          const bar = document.querySelector('.compare-bar > span');
+          const bn = bar && textNode(bar);
+          if (bn && /cars? selected/.test(bn.textContent)) bn.textContent = bn.textContent.replace(/cars? selected/, (m) => (m === 'car selected' ? 'motor selected' : 'motors selected')); };
+          const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });
+          apply();
+          mo.observe(document.body, { childList: true, subtree: true, attributes: true });
+        }
+      }, { once: true });
+    </script>
+  </body>
+</html>

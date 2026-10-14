@@ -1,0 +1,17 @@
+{
+  "id": "step-headings-inconsistent",
+  "case": "booking-clean",
+  "kind": "defect",
+  "title": "Each step heading styled differently",
+  "symptom": "The four equivalent step headings each get their own treatment: \"Treatment\" 26 px bold, \"Practitioner\" 15 px regular (smaller than the body text), \"Date and time\" 22 px italic, \"Your details\" 13 px bold capitals with wide tracking, and the summary heading 18 px at weight 500.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "moderate",
+  "css": "#section-treatment .form-section__head h2 { font-size: 26px; font-weight: 700; }\n#section-practitioner .form-section__head h2 { font-size: 15px; font-weight: 400; }\n#section-time .form-section__head h2 { font-size: 22px; font-weight: 600; font-style: italic; }\n#section-details .form-section__head h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }\n.summary__card h2 { font-size: 18px; font-weight: 500; }",
+  "js": null
+}

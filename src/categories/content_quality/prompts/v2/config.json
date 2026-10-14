@@ -1,0 +1,11 @@
+{
+  "description": "v1 with the rubric's imagery principle: imagery is judged by how well it serves its role, not by its medium, so appropriate illustrations, renderings or icons are not rated below photographs. Uses the current content_quality_rubric.md; v1 keeps its own copy of the earlier rubric.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5"
+}

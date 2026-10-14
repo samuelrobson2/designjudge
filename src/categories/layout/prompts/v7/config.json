@@ -1,0 +1,15 @@
+{
+  "description": "v6 with the added Layout checks and measurements: Proximity Inversion (A) and Broken Images (C) as checks; Text Truncation (B), Row Height Imbalance (C), Hidden Scroll Items, Pinned Layer Over Used Item and Viewport Content Parity (D) as measurements; and the CLS reference for Runtime Layout Stability. Reads the rubric lines marked for the added checks.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "screenshots": "essential",
+    "evidence": "findings",
+    "addedChecks": true
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

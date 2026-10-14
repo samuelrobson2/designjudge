@@ -1,0 +1,13 @@
+{
+  "css": null,
+  "js": "const apply = () => { const rows = [...document.querySelectorAll('tr.order-row')];\nrows.forEach((tr, i) => {\n  if (tr.dataset.djShifted) return;\n  const next = String((i + 1) % rows.length);\n  tr.dataset.djShifted = '1';\n  tr.dataset.order = next;\n  tr.querySelectorAll('[data-order]').forEach((b) => { b.dataset.order = next; });\n}); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "dashboard-clean",
+  "id": "wrong-order-opens",
+  "kind": "defect",
+  "title": "Clicking an order opens the next one",
+  "symptom": "Clicking an order in \"Recent orders\" opens the details of the order below it (clicking #1482 shows #1481, with another customer and time), so the panel never shows the order that was chosen.",
+  "where": {
+    "interaction": "Click an order in \"Recent orders\""
+  },
+  "severity": "severe"
+}

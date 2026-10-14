@@ -1,0 +1,11 @@
+{
+  "css": ".fgroup[aria-labelledby=\"fg-mileage\"], .fgroup[aria-labelledby=\"fg-fuel\"] { display: none !important; }",
+  "js": null,
+  "case": "carsearch-clean",
+  "id": "no-mileage-fuel-filters",
+  "kind": "defect",
+  "title": "No mileage or fuel type filters",
+  "symptom": "The filter panel (and the phone filter drawer) offers only Price and Make. The Mileage and Fuel type filters the request names are missing.",
+  "where": {},
+  "severity": "severe"
+}

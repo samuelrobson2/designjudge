@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "document.addEventListener('click', (e) => {\n  const el = e.target.closest && e.target.closest(\"[data-date]\");\n  if (!el) return;\n  e.stopPropagation();\n}, true);",
+  "case": "booking-baseline",
+  "id": "date-chips-dead",
+  "kind": "defect",
+  "title": "Dates cannot be changed",
+  "symptom": "Clicking another date in the date strip does nothing: the first date stays selected and its times stay listed, so only appointments on that day can be booked.",
+  "where": {},
+  "severity": "severe"
+}

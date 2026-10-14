@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Behaviour fixture</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1d232b; background: #fff; }
+  header { display: flex; gap: 24px; align-items: center; padding: 12px 24px; border-bottom: 1px solid #d5dae1; }
+  header h1 { font-size: 20px; margin: 0 auto 0 0; }
+  .layout { display: grid; grid-template-columns: 260px 1fr; gap: 32px; padding: 24px; min-height: 2400px; align-items: start; }
+  @media (max-width: 700px) { .layout { grid-template-columns: 1fr; } }
+  aside, section, form { border: 1px solid #d5dae1; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  label { display: flex; gap: 8px; align-items: center; min-height: 32px; }
+  button { font: inherit; min-height: 40px; padding: 6px 14px; border: 1px solid #5b6675; border-radius: 6px; background: #fff; color: #1d232b; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .list li { border: 1px solid #d5dae1; border-radius: 6px; padding: 12px; }
+  .list li.hide { display: none; }
+  .slots { display: flex; flex-wrap: wrap; gap: 8px; }
+  .slot { background: #fff; border: 1px solid #5b6675; color: #1d232b; }
+  .slot.is-selected { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+  .slot:disabled { background: #f1f3f5; border-style: dashed; color: #6b7480; text-decoration: line-through; opacity: 1; }
+  .slots .slot:nth-child(2), .slots .slot:nth-child(5) { background: #f1f3f5; border-style: dashed; color: #6b7480; text-decoration: line-through; }
+  .bar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #d5dae1; padding: 8px 0; display: flex; gap: 8px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .tile { position: relative; display: block; height: 120px; border: 1px solid #d5dae1; border-radius: 6px; color: inherit; text-decoration: none; padding: 12px; }
+  .tile .peek { position: absolute; left: 12px; bottom: 12px; opacity: 0; transition: opacity 200ms; background: #1d232b; color: #fff; padding: 4px 8px; border-radius: 4px; }
+  .tiles--hover .tile:hover .peek { opacity: 1; }
+  .tiles--both .tile:hover .peek, .tiles--both .tile:focus-within .peek, .tiles--both .tile:focus .peek { opacity: 1; }
+  .icon-btn { position: relative; width: 44px; padding: 0; }
+  .icon-btn .tip { position: absolute; top: 100%; left: 0; opacity: 0; background: #1d232b; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .icon-btn:hover .tip { opacity: 1; }
+  .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: none; align-items: center; justify-content: center; }
+  .scrim.open { display: flex; }
+  #help-scrim { position: absolute; inset: auto 0; height: 100vh; }
+  dialog#about { border: 1px solid #5b6675; border-radius: 8px; padding: 24px; }
+  dialog#about::backdrop { background: rgba(0, 0, 0, 0.45); }
+  .scrim [role=dialog] { background: #fff; border-radius: 8px; padding: 24px; width: min(480px, 90vw); }
+  .notes { position: fixed; top: 0; right: 0; width: 320px; height: 100vh; background: #fff; border-left: 1px solid #d5dae1; padding: 24px; transform: translateX(100%); visibility: hidden; }
+  .notes.open { transform: none; visibility: visible; }
+  body.locked { overflow: hidden; }
+  .skip:not(:focus) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+</style>
+</head>
+<body>
+<a class="skip" href="#items">Skip to items</a>
+<header>
+  <h1>Behaviour fixture</h1>
+  <a href="#items" id="saved-count">Saved (0)</a>
+  <span id="bm-count">Bookmarks 0</span>
+</header>
+<div class="layout">
+  <aside class="filters" aria-label="Filters">
+    <div role="group" aria-labelledby="g-colour">
+      <h2 id="g-colour">Colour</h2>
+      <label><input type="checkbox" data-colour="red"> Red</label>
+      <label><input type="checkbox" data-colour="blue"> Blue</label>
+      <label><input type="checkbox" data-colour="green"> Green</label>
+      <label><input type="checkbox" data-colour="amber"> Amber</label>
+    </div>
+    <div role="group" aria-labelledby="g-size">
+      <h2 id="g-size">Size</h2>
+      <label><input type="checkbox" data-size="s"> Small</label>
+      <label><input type="checkbox" data-size="m"> Medium</label>
+      <label><input type="checkbox" data-size="l"> Large</label>
+      <label><input type="checkbox" data-size="xl"> Extra large</label>
+    </div>
+  </aside>
+  <main>
+    <section aria-label="Preferences">
+      <div role="group" aria-labelledby="g-notify">
+        <h2 id="g-notify">Notify me by</h2>
+        <label><input type="checkbox" data-notify="email"> Email</label>
+        <label><input type="checkbox" data-notify="sms"> Text message</label>
+        <label><input type="checkbox" data-notify="post"> Post</label>
+      </div>
+    </section>
+    <form class="order" aria-label="Delivery" onsubmit="event.preventDefault(); document.getElementById('order-out').textContent = 'Delivery chosen';">
+      <fieldset>
+        <legend>Delivery</legend>
+        <label><input type="radio" name="del" value="std"> Standard</label>
+        <label><input type="radio" name="del" value="exp"> Express</label>
+        <label><input type="radio" name="del" value="col"> Collect</label>
+      </fieldset>
+      <button type="submit">Choose delivery</button>
+      <p id="order-out" role="status"></p>
+    </form>
+    <section aria-label="Items" id="items">
+      <h2>Items</h2>
+      <ul class="list" id="list"></ul>
+      <div class="bar" id="pick-bar"></div>
+    </section>
+    <section aria-label="Batches">
+      <h2>Batches</h2>
+      <ul class="list" id="batches"></ul>
+      <div class="bar" id="batch-bar"></div>
+    </section>
+    <section aria-label="Times">
+      <h2>Times</h2>
+      <div class="slots" id="slots">
+        <button type="button" class="slot">09:00</button>
+        <button type="button" class="slot">09:30</button>
+        <button type="button" class="slot is-selected" aria-pressed="true">10:00</button>
+        <button type="button" class="slot is-unavailable" disabled>10:30</button>
+        <button type="button" class="slot">11:00</button>
+        <button type="button" class="slot">11:30</button>
+        <button type="button" class="slot">12:00</button>
+      </div>
+      <p id="slot-out" aria-live="polite"></p>
+    </section>
+    <section aria-label="Tiles">
+      <h2>Tiles</h2>
+      <div class="tiles tiles--hover">
+        <a class="tile" href="#t1">Tile one<span class="peek">Quick view: 3 sizes</span></a>
+        <a class="tile" href="#t2">Tile two<span class="peek">Quick view: 2 sizes</span></a>
+        <a class="tile" href="#t3">Tile three<span class="peek">Quick view: 5 sizes</span></a>
+      </div>
+      <div class="tiles tiles--both">
+        <a class="tile" href="#t4">Tile four<span class="peek">Ships tomorrow</span></a>
+        <a class="tile" href="#t5">Tile five<span class="peek">Ships in a week</span></a>
+        <a class="tile" href="#t6">Tile six<span class="peek">Ships today</span></a>
+      </div>
+      <p><button type="button" class="icon-btn" aria-label="Share" id="share">⇪<span class="tip">Share</span></button></p>
+    </section>
+    <section aria-label="Panels">
+      <h2>Panels</h2>
+      <button type="button" id="open-settings">Open settings</button>
+      <button type="button" id="open-help">Open help</button>
+      <button type="button" id="open-about">About this page</button>
+      <button type="button" id="open-notes" aria-expanded="false" aria-controls="notes">Show notes</button>
+    </section>
+  </main>
+</div>
+<div class="scrim" id="settings-scrim">
+  <div role="dialog" aria-modal="true" aria-labelledby="settings-h" id="settings">
+    <h2 id="settings-h">Settings</h2>
+    <label><input type="checkbox" id="dark"> Dark mode</label>
+    <button type="button" id="settings-close">Close</button>
+  </div>
+</div>
+<div class="scrim" id="help-scrim">
+  <div role="dialog" aria-modal="true" aria-labelledby="help-h" id="help">
+    <h2 id="help-h">Help</h2>
+    <p>Read the <a href="#guide">guide</a> or <a href="#faq">questions</a>.</p>
+  </div>
+</div>
+<dialog id="about" aria-labelledby="about-h">
+  <h2 id="about-h">About</h2>
+  <p>A page for trying dialogs, choices and saving.</p>
+  <button type="button" id="about-close">Close</button>
+</dialog>
+<div class="notes" id="notes" role="region" aria-label="Notes">
+  <h2>Notes</h2>
+  <p>Remember to <a href="#items">check the items</a>.</p>
+  <button type="button" id="notes-pin">Pin note</button>
+</div>
+<script>
+  const later = (ms, fn) => setTimeout(fn, ms);
+  const ITEMS = [['Red kettle', 'red'], ['Blue mug', 'blue'], ['Green bowl', 'green'], ['Amber jar', 'amber'], ['Red plate', 'red'], ['Blue cup', 'blue']];
+  const saved = new Set(JSON.parse(localStorage.getItem('saved') || '[]'));
+  let bookmarks = 0;
+  const colours = new Set();
+  const picks = new Set();
+  const batches = new Set();
+  const list = document.getElementById('list');
+  list.innerHTML = ITEMS.map(([name, colour], i) => `<li data-c="${colour}"><h3>${name}</h3><p>${colour}</p>
+    <button type="button" class="save" aria-pressed="${saved.has(i)}" data-i="${i}" aria-label="Save ${name}">${saved.has(i) ? '♥' : '♡'}</button>
+    <button type="button" class="bm" data-i="${i}">Bookmark</button>
+    <button type="button" class="like" aria-pressed="false" aria-label="Like ${name}">♡ Like</button>
+    <label><input type="checkbox" class="pick" data-i="${i}"> Pick</label></li>`).join('');
+  const batchList = document.getElementById('batches');
+  batchList.innerHTML = ['Batch A', 'Batch B', 'Batch C', 'Batch D'].map((n, i) => `<li><h3>${n}</h3><label><input type="checkbox" class="choose" data-i="${i}"> Choose</label></li>`).join('');
+  const showSaved = () => { document.getElementById('saved-count').textContent = `Saved (${saved.size})`; };
+  showSaved();
+  const pickBar = () => {
+    const bar = document.getElementById('pick-bar');
+    bar.innerHTML = picks.size ? `<span>${picks.size} picked</span><button type="button" id="clear-picks">Clear picks</button><button type="button" id="compare" ${picks.size < 2 ? 'disabled' : ''}>Compare</button>` : '';
+  };
+  const batchBar = () => {
+    const bar = document.getElementById('batch-bar');
+    bar.innerHTML = batches.size >= 2 ? `<button type="button" id="merge">Merge batches</button>` : '';
+  };
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset.colour) {
+      t.checked ? colours.add(t.dataset.colour) : colours.delete(t.dataset.colour);
+      later(200, () => { for (const li of list.children) li.classList.toggle('hide', colours.size > 0 && !colours.has(li.dataset.c)); });
+    }
+    if (t.classList.contains('pick')) { t.checked ? picks.add(t.dataset.i) : picks.delete(t.dataset.i); later(100, pickBar); }
+    if (t.classList.contains('choose')) { t.checked ? batches.add(t.dataset.i) : batches.delete(t.dataset.i); later(100, batchBar); }
+  });
+  let lastFocus = null;
+  const openModal = (id) => {
+    lastFocus = document.activeElement;
+    later(120, () => {
+      const scrim = document.getElementById(id + '-scrim');
+      if (id === 'help') scrim.style.top = `${scrollY}px`;
+      scrim.classList.add('open');
+      if (id === 'settings') {
+        document.body.classList.add('locked');
+        for (const el of document.querySelectorAll('header, .layout')) el.inert = true;
+        document.getElementById('dark').focus();
+      }
+    });
+  };
+  const closeSettings = () => {
+    document.getElementById('settings-scrim').classList.remove('open');
+    document.body.classList.remove('locked');
+    for (const el of document.querySelectorAll('header, .layout')) el.inert = false;
+    lastFocus && lastFocus.focus();
+  };
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.classList.contains('save')) {
+      const i = Number(t.dataset.i);
+      later(150, () => {
+        saved.has(i) ? saved.delete(i) : saved.add(i);
+        localStorage.setItem('saved', JSON.stringify([...saved]));
+        t.setAttribute('aria-pressed', String(saved.has(i)));
+        t.textContent = saved.has(i) ? '♥' : '♡';
+        showSaved();
+      });
+    }
+    if (t.classList.contains('bm')) later(150, () => { bookmarks++; document.getElementById('bm-count').textContent = `Bookmarks ${bookmarks}`; });
+    if (t.classList.contains('like')) t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true'));
+    if (t.classList.contains('slot') && !t.disabled) later(100, () => {
+      for (const s of document.querySelectorAll('.slot')) { s.classList.remove('is-selected'); s.removeAttribute('aria-pressed'); }
+      t.classList.add('is-selected'); t.setAttribute('aria-pressed', 'true');
+      document.getElementById('slot-out').textContent = `${t.textContent} selected`;
+    });
+    if (t.id === 'clear-picks') { picks.clear(); for (const c of document.querySelectorAll('.pick')) c.checked = false; pickBar(); }
+    if (t.id === 'compare') later(150, () => { document.getElementById('pick-bar').insertAdjacentHTML('beforeend', `<p role="status">Comparing ${picks.size} items</p>`); });
+    if (t.id === 'open-settings') openModal('settings');
+    if (t.id === 'open-help') openModal('help');
+    if (t.id === 'open-about') later(120, () => document.getElementById('about').showModal());
+    if (t.id === 'about-close') document.getElementById('about').close();
+    if (t.id === 'settings-close') closeSettings();
+    if (t.id === 'share') later(100, () => document.getElementById('slot-out').textContent = 'Link copied');
+    if (t.id === 'notes-pin') t.textContent = t.textContent === 'Pin note' ? 'Unpin note' : 'Pin note';
+    if (t.id === 'open-notes') {
+      const open = t.getAttribute('aria-expanded') !== 'true';
+      t.setAttribute('aria-expanded', String(open));
+      later(150, () => document.getElementById('notes').classList.toggle('open', open));
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    const scrim = document.getElementById('settings-scrim');
+    if (!scrim.classList.contains('open')) return;
+    if (e.key === 'Escape') closeSettings();
+  });
+</script>
+</body>
+</html>

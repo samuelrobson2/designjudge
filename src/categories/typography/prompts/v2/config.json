@@ -1,0 +1,13 @@
+{
+  "description": "v1 with the Squeezed Text Wrapping measurement under criterion B (text broken into many very short lines in a narrow column). Reads the rubric lines marked for the added checks.",
+  "rubric": "llm",
+  "render": "text",
+  "packet": {
+    "grouping": "by-criterion",
+    "evidence": "findings"
+  },
+  "schemaDescriptions": true,
+  "decisiveFindings": false,
+  "materiality": "v5",
+  "measurementBlocks": true
+}

@@ -1,0 +1,17 @@
+{
+  "id": "harmless-accent-teal",
+  "case": "dashboard-clean",
+  "kind": "harmless",
+  "title": "Accent colour changed to teal",
+  "symptom": "The accent colour, its darker shade and its tint change from orange to teal. The type is unchanged.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "none",
+  "css": ":root { --accent: #0f766e; --accent-strong: #115e59; --accent-soft: #e6f4f1; }",
+  "js": null
+}

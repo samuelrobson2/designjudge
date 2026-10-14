@@ -1,0 +1,17 @@
+{
+  "id": "headings-set-as-body",
+  "case": "booking-clean",
+  "kind": "defect",
+  "title": "Headings set like body text",
+  "symptom": "The page title, the four step headings, the summary heading and the Morning/Afternoon headings are all 16 px at weight 400, the same as body text, so nothing on the page reads as a heading.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "severe",
+  "css": ".page__title, .form-section__head h2, .summary__card h2, .slot-group__title, .error-summary__title, .confirmation h1 { font-size: 16px !important; font-weight: 400 !important; }",
+  "js": null
+}

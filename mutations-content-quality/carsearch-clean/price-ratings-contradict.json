@@ -1,0 +1,11 @@
+{
+  "css": null,
+  "js": "const apply = () => { document.querySelectorAll('.car__rating').forEach((p) => {\n  if (p.dataset.flipped || p.classList.contains('car__rating--fair')) return;\n  p.dataset.flipped = '1';\n  const node = [...p.childNodes].find((n) => n.nodeType === 3 && /(below|above) average/.test(n.textContent));\n  if (node) node.textContent = node.textContent.replace(/below|above/, (w) => (w === 'below' ? 'above' : 'below'));\n}); };\nconst mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true, attributes: true }); });\napply();\nmo.observe(document.body, { childList: true, subtree: true, attributes: true });",
+  "case": "carsearch-clean",
+  "id": "price-ratings-contradict",
+  "kind": "defect",
+  "title": "Price ratings contradict their own amounts",
+  "symptom": "Each rating badge now disagrees with the figure beside it: \"Great price · £1,050 above average\", \"High price · £550 below average\", \"Good price · £805 above average\", while the note above the results still says the ratings compare each car with the average price.",
+  "where": {},
+  "severity": "severe"
+}

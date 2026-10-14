@@ -1,0 +1,20 @@
+{
+  "id": "harmless-roomier-form",
+  "case": "booking-clean",
+  "kind": "harmless",
+  "title": "More room inside the form on wide screens",
+  "symptom": "From 1024 px the form has 40 px side padding instead of 32 px, its steps 40 px instead of 36 px above and below, and the gap to the summary is 48 px instead of 40 px.",
+  "where": {
+    "viewports": [
+      "desktop"
+    ],
+    "widths": [
+      1024,
+      1920
+    ],
+    "interaction": null
+  },
+  "severity": "none",
+  "css": "@media (min-width: 1024px) {\n  .booking-form { padding: 0 40px; }\n  .form-section { padding: 40px 0; }\n  .booking-layout { gap: 48px; }\n}",
+  "js": null
+}

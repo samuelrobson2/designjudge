@@ -6,12 +6,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ARTIFACTS_DIR } from '../config.ts';
-import { loadOrBuildPacket } from '../categories/index.ts';
-import { LAYOUT_CRITERIA } from '../categories/layout/definition.ts';
+import { categoryOf, loadOrBuildPacket } from '../categories/index.ts';
 import { DIAGNOSTIC_HOME } from '../categories/layout/homes.ts';
 import { LAYOUT_PACKET_VERSION_FINDINGS } from '../categories/layout/packet.ts';
 import type { Packet } from '../categories/types.ts';
-import { DIAG_NAMES } from '../diagnostics/run.ts';
+import { DIAG_NAMES, FUNCTIONALITY_DIAGNOSTICS, VISUAL_SYSTEM_DIAGNOSTICS } from '../diagnostics/run.ts';
 import type { JudgmentRecord } from '../judge/record.ts';
 import { loadBundle, loadDiagnostics } from '../store.ts';
 import type { Bundle, DiagnosticResult, Diagnostics } from '../types.ts';
@@ -44,6 +43,37 @@ const MISSING = ['not_collected', 'unavailable', 'error'];
 
 export const evidenceId = (r: DiagnosticResult) => `${r.kind === 'deterministic' ? 'C' : 'O'}-${r.diagId}${r.stateId ? `-${r.stateId}` : ''}`;
 
+// The criterion each Visual System and Functionality diagnostic is listed under in its packet.
+const PROBE_HOMES: Record<string, string> = {
+  required_contrast: 'visual_system A',
+  contrast_profile: 'visual_system A',
+  style_vocabulary: 'visual_system A/B/C',
+  peer_consistency: 'visual_system B',
+  accessibility_violations: 'visual_system C',
+  focus_visibility: 'visual_system C',
+  target_size: 'visual_system C',
+  no_effect_controls: 'functionality A',
+  form_submission: 'functionality A',
+  navigation_integrity: 'functionality A',
+  control_operability: 'functionality B',
+  editable_response: 'functionality B',
+  toggle_state: 'functionality B',
+  invalid_submission: 'functionality D',
+  runtime_errors: 'functionality D',
+};
+
+export function criterionOf(diagId: string): string {
+  return DIAGNOSTIC_HOME[diagId] ?? PROBE_HOMES[diagId] ?? '';
+}
+
+// The results a category's summary counts: its own for the probe categories; for the others, every
+// result except the probe categories' (as before they existed).
+function ownResults(category: string, results: DiagnosticResult[]): DiagnosticResult[] {
+  const sets: Record<string, Set<string>> = { visual_system: VISUAL_SYSTEM_DIAGNOSTICS, functionality: FUNCTIONALITY_DIAGNOSTICS };
+  const own = sets[category];
+  return results.filter((r) => (own ? own.has(r.diagId) : !VISUAL_SYSTEM_DIAGNOSTICS.has(r.diagId) && !FUNCTIONALITY_DIAGNOSTICS.has(r.diagId)));
+}
+
 // How many judgments cite each result, directly (C-/O- IDs) or through one of its items.
 export function citations(judgments: JudgmentRecord[], diags: Diagnostics): Map<string, number> {
   const ids = diags.results.map(evidenceId).sort((a, b) => b.length - a.length);
@@ -51,7 +81,7 @@ export function citations(judgments: JudgmentRecord[], diags: Diagnostics): Map<
   for (const j of judgments) {
     if (!j.output) continue;
     const cited = new Set<string>();
-    for (const c of LAYOUT_CRITERIA) {
+    for (const c of categoryOf(j.category ?? 'layout').criteria) {
       for (const f of j.output.criteria[c.id].findings) {
         for (const ref of f.evidence_refs) {
           const asResult = ref.replace(/^F-/, 'C-');
@@ -93,7 +123,7 @@ export function checkRows(
     const first = r.items[0];
     return [
       ctx.runId ?? '', bundle.caseId, bundle.bundleId, id, DIAG_NAMES[r.diagId] ?? r.diagId, r.diagId,
-      r.kind === 'deterministic' ? 'check' : 'observation', DIAGNOSTIC_HOME[r.diagId] ?? '',
+      r.kind === 'deterministic' ? 'check' : 'observation', criterionOf(r.diagId),
       r.stateId ?? 'all', s?.label ?? (r.stateId ? r.stateId : 'All states'), s?.kind ?? (r.stateId ? '' : 'matrix'),
       s ? `${s.viewport.width}×${s.viewport.height}` : '', s?.fixture ?? '',
       STATUS[r.status] ?? r.status, r.evaluated ?? '', r.items.length, r.summary, first?.summary ?? '',
@@ -155,9 +185,12 @@ export function summaryRow(
   diags: Diagnostics,
   ctx: { runId?: string; role?: string; packet?: Packet | null; judgment?: JudgmentRecord; run?: { model: string; effort: string; promptVersion: string } } = {},
 ): Cell[] {
-  const checks = diags.results.filter((r) => r.kind === 'deterministic');
   const j = ctx.judgment;
-  const findings = j?.output ? LAYOUT_CRITERIA.flatMap((c) => j.output!.criteria[c.id].findings) : [];
+  const category = j?.category ?? ctx.packet?.category ?? 'layout';
+  const own = ownResults(category, diags.results);
+  const checks = own.filter((r) => r.kind === 'deterministic');
+  const criteria = categoryOf(category).criteria;
+  const findings = j?.output ? criteria.flatMap((c) => j.output!.criteria[c.id].findings) : [];
   const images = ctx.packet?.images ?? [];
   const sentChecks = ctx.packet ? checks.filter((r) => ctx.packet!.index[evidenceId(r)]).length : null;
   return [
@@ -167,15 +200,16 @@ export function summaryRow(
     checks.filter((r) => r.status === 'pass').length,
     checks.filter((r) => r.status === 'fail').length,
     checks.filter((r) => MISSING.includes(r.status)).length,
-    failingChecks(bundle, diags),
-    diags.results.filter((r) => r.kind === 'observation' && r.status === 'observed').length,
+    failingChecks(bundle, { ...diags, results: checks }),
+    own.filter((r) => r.kind === 'observation' && r.status === 'observed').length,
     sentChecks,
     j?.output?.overall.score ?? null, j?.output?.overall.anchor ?? null,
     j ? findings.filter((f) => f.polarity === 'strength').length : null,
     j ? findings.filter((f) => f.polarity !== 'strength').length : null,
     j ? findings.filter((f) => f.polarity !== 'strength' && f.materiality === 'material').length : null,
     j?.output?.overall.decisive_finding_ids?.join(' ') ?? '', j?.output?.overall.reasoning ?? '',
-    ...LAYOUT_CRITERIA.map((c) => j?.output?.criteria[c.id]?.summary ?? ''),
+    // One column per header criterion, so categories with fewer criteria keep the columns aligned.
+    ...['A', 'B', 'C', 'D'].map((id) => j?.output?.criteria[id]?.summary ?? ''),
     j?.output?.missing_evidence.map((m) => `${m.evidence} (${m.affected_criteria.join(', ')}): ${m.effect_on_assessment}`).join(' | ') ?? '',
     j?.output?.untrusted_content_notes.join(' | ') ?? '',
     j?.reasoningSummary ?? '',

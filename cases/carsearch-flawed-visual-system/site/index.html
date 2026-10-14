@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Used cars near Bristol · Motorwise</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .deal--great { color: #86c99c; } .deal--good { color: #93b4ef; }
+      .car:nth-child(3n) { background: #eef0f3; border: 1px dashed #9aa3b0; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="app.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const apply = () => { document.querySelectorAll('.save[aria-label]').forEach((b) => { b.removeAttribute('aria-label'); b.textContent = ''; b.style.backgroundImage = 'radial-gradient(circle, #e11d48 30%, transparent 32%)'; }); };
+        const mo = new MutationObserver(() => { mo.disconnect(); apply(); mo.observe(document.body, { childList: true, subtree: true }); });
+        apply();
+        mo.observe(document.body, { childList: true, subtree: true });
+      }, { once: true });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "id": "metrics-demoted",
+  "case": "dashboard-clean",
+  "kind": "defect",
+  "title": "Card headings and metric labels overpower the figures",
+  "symptom": "The revenue figure and the KPI values drop to 14 px regular, the size of the table text, while the card headings (\"Revenue\", \"Recent orders\", \"Top products\") and the KPI labels grow to 32 px bold, larger than the 28 px page title, so the labels are what stands out and the numbers the owner tracks are the least prominent text in each card.",
+  "where": {
+    "viewports": [
+      "desktop",
+      "tablet",
+      "phone"
+    ]
+  },
+  "severity": "severe",
+  "css": ".hero__value, .kpi__value { font-size: 14px !important; font-weight: 400 !important; letter-spacing: 0 !important; line-height: 1.5 !important; }\n.card h2, .hero h2, .kpi__label { font-size: 32px !important; font-weight: 700 !important; line-height: 1.2; color: var(--text) !important; overflow-wrap: anywhere; }",
+  "js": null
+}
