@@ -77,7 +77,7 @@ To compare runs side by side, run `npm run compare -- <run id> <run id>`.
 
 ### How people rate
 
-Send people the rating site link. They choose a category (Layout, Typography, Task Fit or Content Quality), pick an interface, read the instructions, go through the category's criteria one page at a time (four, or three for Content Quality), then give a score. Their name is shown with their rating, and ratings are public.
+Send people the rating site link. They choose a category (Layout, Typography, Visual System, Content Quality, Task Fit or Functionality), pick an interface, read the instructions, go through the category's criteria one page at a time, then give a score. Their name is shown with their rating, and ratings are public.
 
 On each criterion page they can use the interface itself. Buttons switch it between desktop, tablet and phone sizes, and a menu switches its content (empty, lots of content, longer text, stress test). Screenshots are only shown where the automated checks found a problem; Typography also links its type specimen sheets from the measurements that use them. Task Fit and Content Quality have no automated checks, so their pages show the interface and the criterion only. They write one note per criterion, with questions from the rubric as prompts, and can click Speak to dictate instead of typing. Dictation uses the browser's speech recognition, so it doesn't work in Firefox.
 
@@ -91,7 +91,7 @@ Every rating is saved as its own JSON file in this repo, at:
 
 ```
 benchmark/human/<interface>/<date-time>-<name>.json              Layout
-benchmark/human/<category>/<interface>/<date-time>-<name>.json   typography, task_fit, content_quality
+benchmark/human/<category>/<interface>/<date-time>-<name>.json   typography, visual_system, content_quality, task_fit, functionality
 ```
 
 Ratings from the website are committed straight to `main`, one commit per rating, with a message like "Add human rating booking-baseline/..." (or "Add human rating typography/booking-baseline/..."). Each file has the score, the note for each criterion, the rater's name, how long they took, and which evidence and prompt version they rated. Ratings in a category folder also have a `category` field; Layout ratings don't.

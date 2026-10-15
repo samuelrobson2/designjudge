@@ -2235,7 +2235,8 @@ async function renderHumanRating(caseId, ratingId, categoryId) {
           : `No judge run has scored this evidence with prompt ${r.promptVersion} yet.`,
       ),
     ),
-    judgmentPanels(r.output, { validation: r.validation, request, showTrace: false }),
+    // The rating form no longer asks for findings, so its finding and reference counts mean nothing.
+    judgmentPanels(r.output, { validation: r.validation?.stats?.findings ? r.validation : null, request, showTrace: false }),
   );
 }
 
