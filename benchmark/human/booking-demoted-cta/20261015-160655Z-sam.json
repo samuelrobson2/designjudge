@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "ratingId": "20261015-160655Z-sam",
+  "caseId": "booking-demoted-cta",
+  "bundleId": "20261014-162943Z-9adc9709",
+  "interfaceId": "iface-d4f1d04b",
+  "promptVersion": "v7",
+  "promptHash": "20e3a32e266a626a",
+  "packetHash": "089fb885e9b7b8d9",
+  "rater": "Sam",
+  "createdAt": "2026-10-15T16:06:55.481Z",
+  "durationMs": 98548,
+  "view": "live",
+  "output": {
+    "criteria": {
+      "A": {
+        "summary": "Decent grouping and hierarchy ",
+        "evaluation_points": {
+          "primary_focus": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "task_aligned_order": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "grouping": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "alignment": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "structural_restraint": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "focused_composition": {
+            "applicable": true,
+            "assessment": ""
+          }
+        },
+        "findings": []
+      },
+      "B": {
+        "summary": "Some content overflow issues ",
+        "evaluation_points": {
+          "appropriate_density": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "efficient_use_of_space": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "clutter_control": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "content_fit": {
+            "applicable": true,
+            "assessment": ""
+          }
+        },
+        "findings": []
+      },
+      "C": {
+        "summary": "Content overflow issues\n",
+        "evaluation_points": {
+          "usable_sizing": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "functional_proportion": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "compositional_balance": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "peer_consistency": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "structural_integrity": {
+            "applicable": true,
+            "assessment": ""
+          }
+        },
+        "findings": []
+      },
+      "D": {
+        "summary": "Looks good",
+        "evaluation_points": {
+          "adaptive_behavior": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "growth_resilience": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "priority_preservation": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "reachability": {
+            "applicable": true,
+            "assessment": ""
+          },
+          "scroll_behavior": {
+            "applicable": true,
+            "assessment": ""
+          }
+        },
+        "findings": []
+      }
+    },
+    "missing_evidence": [],
+    "untrusted_content_notes": [],
+    "overall": {
+      "score": 2,
+      "anchor": "Poor",
+      "reasoning": ""
+    }
+  },
+  "validation": {
+    "schemaValid": true,
+    "schemaErrors": [],
+    "refIssues": [],
+    "otherIssues": [],
+    "stats": {
+      "findings": 0,
+      "strengths": 0,
+      "weaknesses": 0,
+      "missedOpportunities": 0,
+      "material": 0,
+      "refs": 0,
+      "validRefs": 0,
+      "findingsWithValidRef": 0,
+      "missingEvidenceNotes": 0
+    }
+  }
+}
